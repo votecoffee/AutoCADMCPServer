@@ -4,14 +4,17 @@ import base64
 import csv
 import hashlib
 import io
+import os
 import shutil
+import tempfile
 import zipfile
 from email.parser import Parser
 from pathlib import Path
 
 VERSION = "0.14.0"
 FILENAME = "universal_codex_tools-0.14.0-py3-none-any.whl"
-SHA256 = "3063dac969222d54d5babf316c1da61c46cb9443a0a7f202694bbe5b1acaea1d"
+SOURCE_COMMIT = "52478c3868b18faf821ca22fd2bc38e5d0599b9b"
+SHA256 = "bee0f14b3cc6466bbb34226aa74d46e045d7025d98473398dd0c4b6ed2ed1a87"
 
 
 def verify(wheel: Path) -> dict:
@@ -44,7 +47,7 @@ def verify(wheel: Path) -> dict:
             )
         if "universal_tools/framework.py" not in names or not any("LICENSE" in n for n in names):
             raise ValueError("Framework API or license is missing")
-    return {"version": VERSION, "sha256": SHA256, "record_verified": True}
+    return {"version": VERSION, "source_commit": SOURCE_COMMIT, "sha256": SHA256, "record_verified": True}
 
 
 def stage(repo: Path, supplied: str | None = None) -> Path:
@@ -56,10 +59,18 @@ def stage(repo: Path, supplied: str | None = None) -> Path:
         )
     verify(candidate)
     target.parent.mkdir(parents=True, exist_ok=True)
-    if target.exists():
-        verify(target)
     if candidate != target.resolve():
-        shutil.copyfile(candidate, target)
+        # An explicit verified wheel may replace a cache from an older app release,
+        # even when the framework package version is unchanged. Verify copied bytes
+        # before atomic replacement so a failed copy cannot destroy the old cache.
+        with tempfile.NamedTemporaryFile(dir=target.parent, suffix=".whl.tmp", delete=False) as stream:
+            temporary = Path(stream.name)
+        try:
+            shutil.copyfile(candidate, temporary)
+            verify(temporary)
+            os.replace(temporary, target)
+        finally:
+            temporary.unlink(missing_ok=True)
     return target.parent
 
 
