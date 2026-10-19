@@ -1,14 +1,46 @@
-# AutoCAD MCP Server
+# AutoCAD MCP Server _(AutoCADMCPServer)_
 
-Local information extraction from DWG, DXF and PDF drawings through a shared Python service, command line interface and Model Context Protocol server. Sources are preserved. No CAD editing or native application control tools are exposed.
+Source-preserving local DWG, DXF and PDF information extraction for MCP
+
+Extract drawing information through a shared Python service, command line interface and Model Context Protocol server. Sources are preserved. No CAD editing or native application control tools are exposed. The repository is named `AutoCADMCPServer`; the Python distribution uses `autocad-mcp-server` to follow Python package naming conventions.
+
+## Table of Contents
+
+- [Background](#background)
+- [Install](#install)
+  - [Dependencies](#dependencies)
+- [Usage](#usage)
+  - [CLI](#cli)
+  - [Python](#python)
+  - [Connect through Universal Tools](#connect-through-universal-tools)
+  - [Tools](#tools)
+- [Extraction boundaries](#extraction-boundaries)
+- [Validation](#validation)
+- [Development](#development)
+- [Maintainers](#maintainers)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Background
+
+Drawing review often requires finding text, part numbers, attributes, dimensions and references across several files. This server exposes those operations with source hashes and entity or page locations, so an MCP client can trace results back to the drawing. CLI and MCP operations use the same extraction service.
+
+DWG conversion uses an independently installed ODA File Converter. DXF parsing uses [ezdxf](https://ezdxf.readthedocs.io/), PDF extraction uses [PyMuPDF](https://pymupdf.readthedocs.io/), and the server uses the [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk). Backend limitations are described under [Extraction boundaries](#extraction-boundaries).
 
 ## Install
 
-Python 3.11 or later is required. On Windows, install ODA File Converter separately for DWG extraction. The converter is detected under `C:/Program Files/ODA` or configured with an absolute executable path. ODA and Autodesk binaries are not redistributed.
+### Dependencies
 
-From the checkout in PowerShell:
+- [Python](https://www.python.org/downloads/) 3.11 or later. The PowerShell examples use Python 3.13.
+- [ODA File Converter](https://www.opendesign.com/guestfiles/oda_file_converter), installed separately, for DWG extraction. Windows installations are detected under `C:/Program Files/ODA`; an absolute executable path can also be configured. DXF and PDF extraction do not need ODA.
+
+ODA and Autodesk binaries are not redistributed. Python runtime dependencies are installed from the hash-locked requirements file below.
+
+In PowerShell:
 
 ```powershell
+git clone https://github.com/votecoffee/AutoCADMCPServer.git
+cd AutoCADMCPServer
 py -3.13 -m venv .venv
 .venv\Scripts\python.exe -m pip install --require-hashes -r requirements-lock.txt
 .venv\Scripts\python.exe -m pip install --no-deps -e .
@@ -19,6 +51,8 @@ py -3.13 -m venv .venv
 Repeat `--root name=directory` to configure multiple projects. Configuration, caches, search indexes, previews and local acceptance evidence live under ignored `.local/`. The state directory must be separate from all source roots. Existing configuration is preserved; edit `.local/config.json` explicitly to change roots. See `examples/config.example.json`.
 
 ## Usage
+
+### CLI
 
 ```powershell
 .venv\Scripts\python.exe -m autocad_mcp inventory drawings
@@ -33,6 +67,19 @@ Repeat `--root name=directory` to configure multiple projects. Configuration, ca
 Continue index batches at the returned `next_offset` until it is null; check every file status. Tools expose explicit pagination, source hashes and extraction versions. Single-file extraction populates a cache but does not automatically populate the project search index. Search excludes changed or deleted sources and reports current, missing and stale coverage. Reindex changed roots before relying on complete project search. Index cursors are offsets into sorted inventory; restart at zero if files are added or removed during a batch sequence.
 
 `--config PATH` is a global option before the subcommand. `AUTOCAD_MCP_CONFIG` can supply its default. Optional Streamable HTTP binds only to loopback: `serve --transport streamable-http --port 8796`; stdio is the default integration. The loopback HTTP listener does not add authentication and is intended only for a trusted local machine.
+
+### Python
+
+The shared service can also be imported after configuring a drawing root:
+
+```python
+from autocad_mcp.config import Config
+from autocad_mcp.service import DrawingService
+
+service = DrawingService(Config.load(".local/config.json"))
+summary = service.inspect("drawings", "Assembly.dwg")
+print(summary["source"]["sha256"])
+```
 
 ### Connect through Universal Tools
 
@@ -72,7 +119,7 @@ Direct stdio MCP configuration uses the absolute `.venv/Scripts/python.exe` comm
 
 ## Extraction boundaries
 
-DWG is converted to a temporary ACAD2018 DXF using the installed ODA File Converter, with audit and recursion disabled. DXF is parsed by ezdxf. DWT and DWS are routed through the same conversion path and need individual acceptance; these formats are not established by DWG tests. PDF embedded text and positions are extracted using PyMuPDF. PDF tables are heuristic and previews require visual review. The parser stack includes PyMuPDF, which is available under AGPL/commercial licensing; review dependency licenses before redistributing a combined product. No commercial license is supplied by this project.
+DWG is converted to a temporary ACAD2018 DXF using the installed ODA File Converter, with audit and recursion disabled. DXF is parsed by ezdxf. DWT and DWS are routed through the same conversion path and need individual acceptance; these formats are not established by DWG tests. PDF embedded text and positions are extracted using PyMuPDF. PDF tables are heuristic and previews require visual review.
 
 CAD results include handles, layout/layer identifiers, INSERT transforms and attached attributes, polyline vertices, spline control/fit points, knots, weights and XDATA where exposed by ezdxf. Block definitions retain local coordinates. Nested insert transforms are not expanded into world geometry. Dimension values are raw entity measurements; formatted labels, scaling, style overrides and tolerances require separate interpretation. Drawing header extents can be stale or sentinel values and are reported as stored.
 
@@ -89,3 +136,21 @@ See [VERIFICATION.md](VERIFICATION.md) for synthetic checks, real MCP protocol c
 ## Development
 
 Install `requirements-dev-lock.txt` and the editable package, run `python -m pytest -q`, and run `ruff check .` plus `ruff format --check .`. CLI and MCP operations share `DrawingService`; add extraction logic there or in its workers rather than duplicating it in the transport.
+
+The source tree keeps the shared service and workers in `src/autocad_mcp/`, reusable command line helpers in `scripts/`, synthetic fixtures and checks in `tests/`, and generic configuration examples in `examples/`. Machine configuration, runtime environments, customer inputs, extracted content and acceptance captures belong outside the tracked tree or under ignored `.local/`.
+
+## Maintainers
+
+[@votecoffee](https://github.com/votecoffee).
+
+## Contributing
+
+Use [GitHub Issues](https://github.com/votecoffee/AutoCADMCPServer/issues) for questions, bug reports and proposed changes. Pull requests are welcome; include a description of the behavior and the relevant verification results.
+
+Use synthetic fixtures for routine tests, preserve source drawings, and keep customer data, personal paths, credentials and machine-specific evidence out of commits. Follow [AGENTS.md](AGENTS.md) for repository guidance and [VERIFICATION.md](VERIFICATION.md) for checks and source packaging. Update this README when the public interface or installation process changes.
+
+## License
+
+[MIT](LICENSE) Copyright (c) 2026 votecoffee.
+
+Third-party dependencies retain their own licenses. PyMuPDF is available under AGPL/commercial licensing; this repository does not supply a commercial license. ODA File Converter must be obtained separately under its own terms.
