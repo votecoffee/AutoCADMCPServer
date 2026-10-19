@@ -35,6 +35,8 @@ All five state-changing tools accept an optional `request_id`: indexing, preview
 
 For `cad_export_electrical_project`, sending the same ID and identical arguments again returns the recorded artifact path and hash, with `replayed: true`. It does not create another export. A different argument set under that ID is rejected. IDs are shared by all clients of the configured state directory; prefer UUIDs or another suitably unique scheme. Explicit default values and omitted defaults are normalized before fingerprinting.
 
+Replayed responses retain their original timestamps and as-of freshness observations. Use a current read operation when the caller needs to verify source freshness again.
+
 Call `cad_get_transaction` after a timeout or disconnect. Set `include_result=true` for a recorded result. Lookup never dispatches the original operation.
 
 | State | Meaning |

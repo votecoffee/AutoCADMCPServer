@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import errno
 import hashlib
 import os
 import threading
@@ -39,8 +40,10 @@ class Coordinator:
                 import fcntl
 
                 fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except (OSError, BlockingIOError):
+        except OSError as error:
             stream.close()
+            if error.errno not in {errno.EACCES, errno.EAGAIN, errno.EDEADLK, errno.EBUSY}:
+                raise
             return None
         return stream
 

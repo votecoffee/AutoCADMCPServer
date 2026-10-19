@@ -43,8 +43,8 @@
       "bytes": 45025
     },
     "docs/concurrency.md": {
-      "sha256": "47b510170b583fdbcac9155662bdbc414cf27dfcfffdf4bf922b1e48a504800c",
-      "bytes": 6243
+      "sha256": "ecb81f39bfd1dca6160bd9991be14ea68312d8ab05ddddf52c0c12d0764490e0",
+      "bytes": 6415
     },
     "docs/electrical-data.md": {
       "sha256": "ccceb6580b9725a341401033479a66e1fe02e0e9ecb9b9647c9e175b5c0a3a70",
@@ -143,12 +143,12 @@
       "bytes": 4797
     },
     "src/autocad_mcp/coordination.py": {
-      "sha256": "dcb6453e8a5662e59aaa984f43bc3e7768263ebdab7dd560daf9d91e082298d5",
-      "bytes": 5322
+      "sha256": "a9b668659d5ec7adf8fb3c0e3e1fff8f6d8b040631f36d4bef45a6cf5c626b19",
+      "bytes": 5439
     },
     "src/autocad_mcp/electrical.py": {
-      "sha256": "b01121c767d60469fe759b605c60fb9031626017c09cf82bfab73d8bc7437381",
-      "bytes": 33107
+      "sha256": "5a7469640cd78287be4e7985088dada01eace509b9d6f496193c4b768fa7611c",
+      "bytes": 33330
     },
     "src/autocad_mcp/electrical_graph.py": {
       "sha256": "385e3c8c4914c87b7309c832b5e4f0f141375fe59afae7db3ba878e68e0cfd49",
@@ -187,8 +187,8 @@
       "bytes": 24496
     },
     "src/autocad_mcp/transactions.py": {
-      "sha256": "d3ca20d0bf39a7f88b78af8f9ea0c0cc82ff6eb03092cfaa2eab865e4a4bb188",
-      "bytes": 6317
+      "sha256": "ff24e42f36f03cc0aff98ed879727735d1b62f2c9c64680bc08045c4939e6955",
+      "bytes": 6547
     },
     "tests/conftest.py": {
       "sha256": "c42602f12f17b3c71ffd5b576f4f3b5f8a89f6c97e7d892dd7c0ff98db46bd9f",
@@ -199,8 +199,8 @@
       "bytes": 2106
     },
     "tests/test_concurrency.py": {
-      "sha256": "708520ed1c4a976850fdc60a040d5ffef59996380ef2f8de6dcba76141495152",
-      "bytes": 9058
+      "sha256": "19c8be9b810f999f255f51e78a8a9c38da31a8cc2f955d13e5a43855f726cc88",
+      "bytes": 9663
     },
     "tests/test_electrical_graph.py": {
       "sha256": "8efeec6b46db616d9dc3b885b09725c0edda745c1318a45ae36a2df6eefcf72a",
@@ -211,8 +211,8 @@
       "bytes": 8604
     },
     "tests/test_electrical_service.py": {
-      "sha256": "5aa605c24c37b2ac952bb4cf2957ec0e95fa2a51096ef471a135278fa2241a25",
-      "bytes": 5730
+      "sha256": "347c325cfbab0d3f36b244ee39025eb11cbc2e753702fe343fea179d6316356a",
+      "bytes": 6848
     },
     "tests/test_extraction.py": {
       "sha256": "ed10d263acba3799f59fa5328fe26c4c902f4c09859957f19f0db597ce55b5b2",
@@ -223,8 +223,8 @@
       "bytes": 1627
     },
     "tests/test_protocol.py": {
-      "sha256": "20f899ad7e6c335061070cdbc2d186668c1120c1489585d2fcda2a40f48e2632",
-      "bytes": 5711
+      "sha256": "d808d5998f8582c729fea2150e23d49a63144766723d9a1d078cfb2842a97601",
+      "bytes": 5896
     }
   }
 }

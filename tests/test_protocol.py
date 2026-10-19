@@ -60,6 +60,11 @@ async def test_cold_worker_extraction_through_real_stdio(drawing_service):
 @pytest.mark.anyio
 async def test_two_mcp_processes_share_transactions_and_state(drawing_service):
     service, source = drawing_service
+    import ezdxf
+
+    drawing = ezdxf.readfile(source / "sample.dxf")
+    drawing.modelspace().add_text("192.0.2.20 255.255.255.0 192.0.2.10")
+    drawing.saveas(source / "sample.dxf")
     parameters = StdioServerParameters(
         command=sys.executable,
         args=["-m", "autocad_mcp", "--config", str(source.parent / "config.json"), "serve"],

@@ -118,3 +118,27 @@ def test_invalid_scope_and_report_paths(project):
         service.load("../outside")
     with pytest.raises(ValueError):
         service.build("test", reports=[{"kind": "components", "relative_path": "../outside.csv"}])
+
+
+def test_rebuilding_duplicate_tags_preserves_snapshot(project):
+    service, root = project
+    doc = ezdxf.readfile(root / "a.dxf")
+    doc.modelspace().add_blockref("DEVICE", (20, 0)).add_auto_attribs({"TAG1": "PE1", "DESC1": "Sensor"})
+    doc.saveas(root / "a.dxf")
+    service.drawings.load("test", "a.dxf")
+    first = service.build("test")
+    assert first["check_counts"]["duplicate_tag"] == 1
+    before = (service.state / "projects" / (first["project_id"] + ".json")).read_bytes()
+    second = service.build("test")
+    assert second["project_id"] == first["project_id"]
+    assert (service.state / "projects" / (first["project_id"] + ".json")).read_bytes() == before
+
+
+def test_text_address_order_is_stable(project):
+    service, root = project
+    doc = ezdxf.readfile(root / "a.dxf")
+    doc.modelspace().add_text("192.0.2.20 / 255.255.255.0 / 192.0.2.10")
+    doc.saveas(root / "a.dxf")
+    service.drawings.load("test", "a.dxf")
+    snapshot = service.load(service.build("test")["project_id"])
+    assert [r["ip_address"] for r in snapshot["network"]] == ["192.0.2.10", "192.0.2.20", "255.255.255.0"]

@@ -167,6 +167,16 @@ def test_failed_request_is_not_reexecuted(tmp_path):
     assert count == 1 and tx.get("failed")["state"] == "failed"
 
 
+def test_unknown_result_retains_reason_and_empty_ids_are_rejected(tmp_path):
+    tx = Transactions(tmp_path, Coordinator(tmp_path))
+    with pytest.raises(ValueError, match="request_id"):
+        tx.execute("", "export", {}, lambda: {"done": True})
+    tx.execute("uncertain", "highlight", {}, lambda: {"status": "unknown", "error": "Timed out"})
+    assert tx.get("uncertain")["error"] == "Timed out"
+    replay = tx.execute("uncertain", "highlight", {}, lambda: pytest.fail("Uncertain action was repeated"))
+    assert replay["transaction"]["state"] == "unknown" and replay["transaction"]["replayed"]
+
+
 def test_crashed_write_is_unknown_and_not_reexecuted(tmp_path):
     context = multiprocessing.get_context("spawn")
     entered, release = context.Event(), context.Event()

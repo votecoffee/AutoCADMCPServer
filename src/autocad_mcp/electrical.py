@@ -44,7 +44,7 @@ def atomic_json(path: Path, value: dict):
     temporary = path.with_name(path.name + "." + uuid.uuid4().hex + ".tmp")
     try:
         temporary.write_text(
-            json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+            json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False),
             encoding="utf-8",
             newline="\n",
         )
@@ -343,8 +343,8 @@ class ElectricalService:
                         for pin in device["connection_points"]:
                             graph.endpoint(device, pin["terminal"], pin["code"])
                 elif row["type"] in {"TEXT", "MTEXT"}:
-                    for address in set(
-                        re.findall(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])", row.get("text", ""))
+                    for address in sorted(
+                        set(re.findall(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])", row.get("text", "")))
                     ):
                         try:
                             ipaddress.ip_address(address)
@@ -438,6 +438,8 @@ class ElectricalService:
             if sha256(self.config.resolve(source["root_id"], source["relative_path"])) != source["sha256"]:
                 raise ValueError("An input changed during project analysis; rebuild from current index")
         snapshot["checks"].sort(key=lambda row: json.dumps(row, sort_keys=True))
+        # Diagnostic identities may be tuples in memory; compare exactly the JSON representation we publish.
+        snapshot = json.loads(json.dumps(snapshot, ensure_ascii=False, allow_nan=False))
         destination = self.state / "projects" / (identifier + ".json")
         with self.drawings.coordinator.lock("project:" + identifier):
             if destination.exists():

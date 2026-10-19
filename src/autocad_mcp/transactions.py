@@ -76,7 +76,7 @@ class Transactions:
         return result
 
     def execute(self, request_id, operation, arguments, fn):
-        request_id = request_id or "request_" + uuid.uuid4().hex
+        request_id = "request_" + uuid.uuid4().hex if request_id is None else request_id
         self.validate(request_id)
         fingerprint = hashlib.sha256(
             json.dumps(
@@ -138,8 +138,14 @@ class Transactions:
                 raise
             with self.database() as db:
                 db.execute(
-                    "UPDATE requests SET state=?,updated=?,result=? WHERE request_id=?",
-                    (state, time.time(), encoded, request_id),
+                    "UPDATE requests SET state=?,updated=?,result=?,error=? WHERE request_id=?",
+                    (
+                        state,
+                        time.time(),
+                        encoded,
+                        result.get("error") if state != "succeeded" else None,
+                        request_id,
+                    ),
                 )
             return {**result, "transaction": self.receipt(self.row(request_id), replayed=False)}
 
