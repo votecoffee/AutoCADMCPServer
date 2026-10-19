@@ -24,7 +24,10 @@ REPORT_ALIASES = {
             ("INST", "INST"),
             ("LOC", "LOC"),
             ("HDL", "HDL"),
+            ("CMPHDL", "HDL"),
             ("DWGIX", "DWGIX"),
+            ("SH", "SH"),
+            ("PD", "TERMDESC"),
             ("FILENAME", "FILENAME"),
         )
     },

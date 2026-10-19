@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import collections
+import fnmatch
 import math
 import re
 
@@ -182,26 +183,38 @@ def add_network_peers(graph: ConnectionGraph, devices: list, networks: list, dia
             )
 
 
-def select_wire_layers(doc: dict, physical: list, explicit: list[str]) -> tuple[set[str], str]:
+def select_wire_layers(doc: dict, physical: list, explicit: list[str]) -> tuple[set[str], str, list[str]]:
     available = {layer["name"].casefold(): layer["name"] for layer in doc["layers"]}
     if explicit:
-        return {
-            name.casefold() for name in explicit if name.casefold() in available
-        }, "explicit_configuration"
+        return (
+            {name.casefold() for name in explicit if name.casefold() in available},
+            "explicit_configuration",
+            [],
+        )
     declared = set()
+    unsupported = []
     for row in physical:
         if row["type"] == "INSERT" and row["properties"].get("name", "").upper() == "WD_M":
             attrs, _ = attribute_values(row)
-            declared.update(
-                s.strip(' "').casefold()
-                for s in re.split(r"[,;|]", attrs.get("WIRELAYS", ""))
-                if s.strip(' "').casefold() in available
-            )
+            for pattern in re.split(r"[,;|]", attrs.get("WIRELAYS", "")):
+                pattern = pattern.strip(' "').casefold()
+                if not pattern:
+                    continue
+                if pattern in available:
+                    declared.add(pattern)
+                elif any(c in pattern for c in "#@.~[]`"):
+                    unsupported.append(pattern)
+                else:
+                    declared.update(name for name in available if fnmatch.fnmatchcase(name, pattern))
     if declared:
-        return declared, "WD_M.WIRELAYS_attribute"
-    return {
-        name for name in available if re.search(r"wire|wiring|awg|pneu[_ ]?tube", name, re.I)
-    }, "layer_name_interpretation"
+        return declared, "WD_M.WIRELAYS_attribute_simple_wildcards", unsupported
+    if unsupported:
+        return set(), "unsupported_WD_M.WIRELAYS_patterns", unsupported
+    return (
+        {name for name in available if re.search(r"wire|wiring|awg|pneu[_ ]?tube", name, re.I)},
+        "layer_name_interpretation",
+        [],
+    )
 
 
 def add_drawing_geometry(
@@ -214,7 +227,16 @@ def add_drawing_geometry(
     explicit_layers: list[str],
     tolerance: float,
 ):
-    layers, layer_basis = select_wire_layers(doc, physical, explicit_layers)
+    layers, layer_basis, unsupported_patterns = select_wire_layers(doc, physical, explicit_layers)
+    if unsupported_patterns:
+        diagnostics.append(
+            issue(
+                "unsupported_wire_layer_patterns",
+                "Configure explicit wire layers for unsupported native wildcard syntax",
+                [drawing],
+                patterns=unsupported_patterns,
+            )
+        )
     segments, pins, dots, labels, signals = [], [], [], [], []
     by_path = {
         tuple(d["sources"][0]["reference_path"]): d
@@ -313,6 +335,7 @@ def add_drawing_geometry(
             "drawing": drawing["relative_path"],
             "wire_layers": sorted(layers),
             "basis": layer_basis,
+            "unsupported_wire_layer_patterns": unsupported_patterns,
             "segments": 0,
             "unattached_pins": len(pins),
         }
@@ -453,6 +476,7 @@ def add_drawing_geometry(
         "drawing": drawing["relative_path"],
         "wire_layers": sorted(layers),
         "basis": layer_basis,
+        "unsupported_wire_layer_patterns": unsupported_patterns,
         "segments": len(segments),
         "unattached_pins": unattached,
     }
@@ -488,7 +512,7 @@ def add_signal_links(graph: ConnectionGraph, signals: list, diagnostics: list):
             )
 
 
-def annotate_wire_numbers(graph: ConnectionGraph):
+def annotate_wire_numbers(graph: ConnectionGraph, diagnostics: list | None = None):
     adjacency = collections.defaultdict(list)
     for edge in graph.edges.values():
         if edge["kind"] in {"wire_segment", "pin_attachment"}:
@@ -509,6 +533,17 @@ def annotate_wire_numbers(graph: ConnectionGraph):
                 edges[edge["id"]] = edge
                 stack.append(other)
         numbers = sorted({label["number"] for label in labels})
+        if len(numbers) > 1 and diagnostics is not None:
+            diagnostics.append(
+                issue(
+                    "conflicting_wire_numbers",
+                    "Inferred continuous geometry carries multiple wire labels",
+                    [label["source"] for label in labels[:16]],
+                    wire_numbers=numbers,
+                    source_count=len(labels),
+                    sources_truncated=len(labels) > 16,
+                )
+            )
         for edge in edges.values():
             edge["wire_numbers"] = numbers
             edge["details"]["wire_label_sources"] = [label["source"] for label in labels[:16]]
@@ -568,12 +603,14 @@ def trace_graph(
                 }
             )
             continue
-        if not next_hops and edges and not node.get("device_id"):
+        if not next_hops and (not node.get("device_id") or not edges):
             incomplete.append(
                 {
                     "end_node": current,
                     "connection_ids": [edge["id"] for edge in edges],
-                    "reason": "Open documented path without a destination device",
+                    "reason": "Open documented path without a destination device"
+                    if edges
+                    else "No selected connection edges at this documented terminal",
                 }
             )
         if len(edges) >= max_depth:

@@ -47,7 +47,13 @@ def main():
         "enabled": True,
         "session_mode": "transient",
         "allow_writes": True,
-        "allowed_write_tools": ["cad_index_project", "cad_render_preview"],
+        "allowed_write_tools": [
+            "cad_index_project",
+            "cad_render_preview",
+            "cad_build_electrical_project",
+            "cad_export_electrical_project",
+            "cad_highlight_source_object",
+        ],
         "timeout_seconds": 300.0,
     }
     registration = local / "autocad.service.json"

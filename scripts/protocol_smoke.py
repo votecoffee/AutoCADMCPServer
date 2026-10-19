@@ -11,7 +11,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 
-async def run(config, root):
+async def run(config, root, project_id=None):
     parameters = StdioServerParameters(
         command=sys.executable, args=["-m", "autocad_mcp", "--config", str(Path(config).resolve()), "serve"]
     )
@@ -27,6 +27,25 @@ async def run(config, root):
             first = inventory.structuredContent["items"][0]["relative_path"]
             inspect = await session.call_tool("cad_inspect", {"root_id": root, "relative_path": first})
             assert not inspect.isError
+            electrical_calls = []
+            if project_id:
+                for name in (
+                    "cad_get_electrical_project",
+                    "cad_get_device_inventory",
+                    "cad_get_plc_io",
+                    "cad_get_connections",
+                    "cad_get_equipment_groups",
+                    "cad_get_network_inventory",
+                    "cad_check_drawing_consistency",
+                    "cad_export_electrical_project",
+                ):
+                    arguments = {"project_id": project_id}
+                    if name not in {"cad_get_electrical_project", "cad_export_electrical_project"}:
+                        arguments["limit"] = 2
+                    result = await session.call_tool(name, arguments)
+                    assert not result.isError, result.content
+                    assert result.structuredContent is not None
+                    electrical_calls.append(name)
             print(
                 json.dumps(
                     {
@@ -34,6 +53,7 @@ async def run(config, root):
                         "tool_count": len(tools),
                         "read_tools": sum(t.annotations.readOnlyHint for t in tools),
                         "source_sha256": inspect.structuredContent["source"]["sha256"],
+                        "electrical_calls": electrical_calls,
                         "passed": True,
                     }
                 )
@@ -44,5 +64,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default=".local/config.json")
     parser.add_argument("--root", required=True)
+    parser.add_argument("--project-id", help="Also exercise electrical reads and app-owned JSON export")
     args = parser.parse_args()
-    asyncio.run(run(args.config, args.root))
+    asyncio.run(run(args.config, args.root, args.project_id))

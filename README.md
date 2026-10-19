@@ -1,8 +1,8 @@
 # AutoCAD MCP Server _(AutoCADMCPServer)_
 
-Source-preserving local DWG, DXF and PDF information extraction for MCP
+Source-preserving local DWG, DXF, PDF and AutoCAD Electrical information extraction for MCP
 
-Extract drawing information through a shared Python service, command line interface and Model Context Protocol server. Sources are preserved. No CAD editing or native application control tools are exposed. The repository is named `AutoCADMCPServer`; the Python distribution uses `autocad-mcp-server` to follow Python package naming conventions.
+Extract drawing information through a shared Python service, command line interface and Model Context Protocol server. Version 0.2 adds device and PLC I/O inventories, connection tracing, equipment grouping, documented network inventory, consistency checks, revision comparison and traceable JSON exports. Native report assertions, observed attributes and interpreted drawing content remain distinct. Sources are preserved. An optional guarded operation highlights a source object in an unchanged drawing already open in AutoCAD. The repository is named `AutoCADMCPServer`; the Python distribution uses `autocad-mcp-server` to follow Python package naming conventions.
 
 ## Table of Contents
 
@@ -12,6 +12,7 @@ Extract drawing information through a shared Python service, command line interf
 - [Usage](#usage)
   - [CLI](#cli)
   - [Python](#python)
+  - [Electrical projects](#electrical-projects)
   - [Connect through Universal Tools](#connect-through-universal-tools)
   - [Tools](#tools)
 - [Extraction boundaries](#extraction-boundaries)
@@ -33,6 +34,8 @@ DWG conversion uses an independently installed ODA File Converter. DXF parsing u
 
 - [Python](https://www.python.org/downloads/) 3.11 or later. The PowerShell examples use Python 3.13.
 - [ODA File Converter](https://www.opendesign.com/guestfiles/oda_file_converter), installed separately, for DWG extraction. Windows installations are detected under `C:/Program Files/ODA`; an absolute executable path can also be configured. DXF and PDF extraction do not need ODA.
+
+Optional source highlighting requires full AutoCAD running on Windows and pywin32, included in the Windows runtime lock through the MCP dependency. TrueView and ODA do not provide the live operation.
 
 ODA and Autodesk binaries are not redistributed. Python runtime dependencies are installed from the hash-locked requirements file below.
 
@@ -81,6 +84,23 @@ summary = service.inspect("drawings", "Assembly.dwg")
 print(summary["source"]["sha256"])
 ```
 
+### Electrical projects
+
+Index the selected drawings first, then build an immutable electrical snapshot:
+
+```powershell
+.venv\Scripts\python.exe -m autocad_mcp electrical-build drawings --wdp 'Control.wdp'
+.venv\Scripts\python.exe -m autocad_mcp electrical-show PROJECT_ID --collection devices
+.venv\Scripts\python.exe -m autocad_mcp electrical-show PROJECT_ID --collection plc_io
+.venv\Scripts\python.exe -m autocad_mcp electrical-trace PROJECT_ID DEVICE_ID --terminal 01
+.venv\Scripts\python.exe -m autocad_mcp electrical-compare BEFORE_PROJECT_ID AFTER_PROJECT_ID
+.venv\Scripts\python.exe -m autocad_mcp electrical-export PROJECT_ID
+```
+
+Replace IDs with returned values. Omit `--wdp` for ordinary DWG/DXF/PDF roots. Use `--options .local/build-options.json` for explicit drawing paths, native CSV/TSV/JSON reports, attribute mappings and wire layers. PDF tags stay separate candidates with page/bounding-box provenance. Analysis does not generate Electrical reports or read MDB databases directly. Unknown values, incomplete paths and ambiguous references remain explicit. See [Electrical data and report formats](docs/electrical-data.md) and the [JSON export schema](schemas/electrical-project.schema.json).
+
+Python clients use `ElectricalService(service).build("drawings", ...)` from `autocad_mcp.electrical`, then its query, trace, compare and export methods. Keep build options and customer exports under ignored `.local/` or outside the checkout. Snapshot freshness is checked against current input hashes; historical snapshots remain readable for revision comparison.
+
 ### Connect through Universal Tools
 
 Use the existing Universal Tools plugin and broker. This app does not require a separate Codex plugin. With the broker already installed:
@@ -91,7 +111,7 @@ Use the existing Universal Tools plugin and broker. This app does not require a 
   --broker-state 'C:\Tools\CodexMCPBroker\.local'
 ```
 
-Then call Universal Tools `refresh_services`, search for `autocad`, describe the chosen tool and invoke it with its catalog revision. Registration preserves existing services and refuses an existing `autocad` registration. For deliberate updates, validate the generated descriptor and use the broker CLI's explicit `register --replace` option. The installer inspects the installed broker schema and supports the older version-1 descriptor. Newer brokers receive an exact write allowlist. Older brokers use their service-wide write flag; this server exposes only two write-classified operations, indexing and preview creation, both limited to app state.
+Then call Universal Tools `refresh_services`, search for `autocad`, describe the chosen tool and invoke it with its catalog revision. Registration preserves other services and refuses an existing `autocad` registration unless `--replace` is supplied. The installer inspects the installed broker schema and supports the older version-1 descriptor. Newer brokers receive an exact write allowlist. Older brokers use their service-wide write flag; five operations are write-classified: indexing, preview creation, electrical snapshot building, JSON export and AutoCAD UI highlighting. Only highlighting affects the running CAD display; file outputs are limited to app state.
 
 Direct stdio MCP configuration uses the absolute `.venv/Scripts/python.exe` command with arguments `['-m', 'autocad_mcp', '--config', 'ABSOLUTE_CONFIG_PATH', 'serve']` and the checkout as working directory. No shell invocation is needed.
 
@@ -116,12 +136,24 @@ Direct stdio MCP configuration uses the absolute `.venv/Scripts/python.exe` comm
 | `cad_search_project` | Literal project text search with freshness and coverage |
 | `cad_compare_drawings` | Text multiplicity and layer/block name changes |
 | `cad_render_preview` | App-owned PNG previews; write-classified |
+| `cad_build_electrical_project` | Build a source-bound snapshot from drawings, optional WDP and explicit reports; write-classified |
+| `cad_get_electrical_project` | Counts, check coverage and current input freshness |
+| `cad_get_device_inventory` | Device occurrences with field provenance; optional separate PDF candidates |
+| `cad_get_plc_io` | Controller/module/channel/address, connected devices, wires and terminals |
+| `cad_get_connections` | Reported/interpreted edges, cable details and source references |
+| `cad_trace_connection` | Bounded electrical/network paths with ambiguity and incomplete ends |
+| `cad_get_equipment_groups` | Installation, location, enclosure/panel, station and WDP context |
+| `cad_get_network_inventory` | Documented addresses, switches, ports/interfaces and unassociated IP text |
+| `cad_check_drawing_consistency` | Duplicate tags, address conflicts, descriptions, references and panel differences |
+| `cad_compare_electrical_revisions` | Added, removed and changed device, I/O and connection records |
+| `cad_export_electrical_project` | Readback-verified JSON with source hashes and references; write-classified |
+| `cad_highlight_source_object` | Highlight/clear one top-level source object in an unchanged open AutoCAD drawing; write-classified |
 
 ## Extraction boundaries
 
 DWG is converted to a temporary ACAD2018 DXF using the installed ODA File Converter, with audit and recursion disabled. DXF is parsed by ezdxf. DWT and DWS are routed through the same conversion path and need individual acceptance; these formats are not established by DWG tests. PDF embedded text and positions are extracted using PyMuPDF. PDF tables are heuristic and previews require visual review.
 
-CAD results include handles, layout/layer identifiers, INSERT transforms and attached attributes, polyline vertices, spline control/fit points, knots, weights and XDATA where exposed by ezdxf. Block definitions retain local coordinates. Nested insert transforms are not expanded into world geometry. Dimension values are raw entity measurements; formatted labels, scaling, style overrides and tolerances require separate interpretation. Drawing header extents can be stale or sentinel values and are reported as stored.
+CAD results include handles, layout/layer identifiers, INSERT transforms and attached attributes, polyline vertices, spline control/fit points, knots, weights and XDATA where exposed by ezdxf. Block definitions retain local coordinates. Electrical analysis expands supported planar nested inserts separately and diagnoses unsupported arrays/extrusions; raw entity queries retain definition coordinates. Dimension values are raw entity measurements; formatted labels, scaling, style overrides and tolerances require separate interpretation. Drawing header extents can be stale or sentinel values and are reported as stored.
 
 Native ACAD_TABLE cell semantics, proxy/custom objects, hatch boundaries, ACIS solids, dynamic block rules and arbitrary extension dictionaries are not fully decoded. There is no native AutoCAD acceptance claim. External references, images, underlays and fonts are not loaded by path; references are reported only. CAD previews use ezdxf's approximate renderer and installed fonts and can omit unsupported content.
 

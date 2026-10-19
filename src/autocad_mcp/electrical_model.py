@@ -97,20 +97,36 @@ def attribute_values(row: dict) -> tuple[dict, list]:
 
 def drawing_metadata(doc: dict) -> dict:
     observed = collections.defaultdict(set)
+    defaults = []
+    native_sheets = set()
     for row in doc["entities"]:
         if row["type"] == "INSERT" and row["layout"] != "@block":
             attrs, _ = attribute_values(row)
+            if row.get("properties", {}).get("name", "").upper() == "WD_M":
+                native_sheets.update(attrs[n] for n in ("SHEET", "SHEET_") if attrs.get(n))
+                defaults.append(
+                    {
+                        "object_handle": row["handle"],
+                        "installation": attrs.get("IEC_INST"),
+                        "location": attrs.get("IEC_LOC"),
+                        "inheritance_applied": False,
+                    }
+                )
             for field, names in (
                 ("sheet", ("SHEET", "SHT_NO", "SHEET_NO", "SHT")),
                 ("revision", ("REVISION", "REV", "DWG_REV")),
             ):
                 observed[field].update(attrs[n] for n in names if attrs.get(n))
+    sheet_values = native_sheets or observed["sheet"]
     return {
         **doc["source"],
-        "sheet": next(iter(observed["sheet"])) if len(observed["sheet"]) == 1 else None,
+        "sheet": next(iter(sheet_values)) if len(sheet_values) == 1 else None,
+        "sheet_basis": "WD_M_drawing_attribute" if native_sheets else "unique_placed_attribute",
+        "native_sheet_candidates": sorted(native_sheets),
         "revision": next(iter(observed["revision"])) if len(observed["revision"]) == 1 else None,
         "sheet_candidates": sorted(observed["sheet"]),
         "revision_candidates": sorted(observed["revision"]),
+        "electrical_drawing_defaults": defaults,
     }
 
 

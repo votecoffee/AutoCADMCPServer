@@ -26,3 +26,30 @@ async def test_cold_worker_extraction_through_real_stdio(drawing_service):
             )
             assert not tables.isError, tables.content
             assert tables.structuredContent["total"] == 1
+            built = await client.call_tool(
+                "cad_build_electrical_project",
+                {"root_id": "test", "drawing_paths": ["sample.dxf", "sample.pdf"]},
+            )
+            assert not built.isError, built.content
+            project_id = built.structuredContent["project_id"]
+            for name in (
+                "cad_get_device_inventory",
+                "cad_get_plc_io",
+                "cad_get_connections",
+                "cad_get_equipment_groups",
+                "cad_get_network_inventory",
+                "cad_check_drawing_consistency",
+                "cad_export_electrical_project",
+            ):
+                result = await client.call_tool(name, {"project_id": project_id})
+                assert not result.isError, result.content
+                assert result.structuredContent is not None
+            compared = await client.call_tool(
+                "cad_compare_electrical_revisions",
+                {"before_project_id": project_id, "after_project_id": project_id},
+            )
+            assert not compared.isError and compared.structuredContent["total"] == 0
+            rejected = await client.call_tool(
+                "cad_highlight_source_object", {"project_id": project_id, "device_id": "missing"}
+            )
+            assert rejected.isError

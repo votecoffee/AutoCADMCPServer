@@ -402,7 +402,7 @@ class ElectricalService:
         add_associations(graph, devices, diagnostics)
         add_signal_links(graph, signals, diagnostics)
         add_network_peers(graph, devices, networks, diagnostics)
-        annotate_wire_numbers(graph)
+        annotate_wire_numbers(graph, diagnostics)
         consistency(devices, io, networks, drawing_info, diagnostics)
         snapshot = {
             "schema_version": SCHEMA_VERSION,
@@ -642,8 +642,22 @@ class ElectricalService:
                             ]
                         )
                     else:
+                        source_drawing = next(
+                            (
+                                (s.get("drawing") or {}).get("relative_path")
+                                for s in node.get("sources", [])
+                                if (s.get("drawing") or {}).get("relative_path")
+                            ),
+                            None,
+                        )
                         endpoints.append(
-                            [node.get("kind"), node.get("tag"), node.get("layout"), node.get("position")]
+                            [
+                                node.get("kind"),
+                                node.get("tag"),
+                                node.get("layout"),
+                                node.get("position"),
+                                source_drawing,
+                            ]
                         )
                 key = json.dumps([edge["kind"], sorted(endpoints, key=str)], sort_keys=True)
                 result[key].append(
@@ -671,6 +685,56 @@ class ElectricalService:
                     {
                         "kind": "connection",
                         "change": "changed" if old and new else "added" if new else "removed",
+                        "identity": json.loads(key),
+                        "before": old,
+                        "after": new,
+                    }
+                )
+
+        def channel_index(snapshot):
+            devices = {d["id"]: d for d in snapshot["devices"]}
+            result = collections.defaultdict(list)
+            for row in snapshot["plc_io"]:
+                module = devices.get(row["module_device_id"], {})
+                identity = (
+                    *equipment_key(module),
+                    row.get("terminal_code"),
+                    row.get("terminal"),
+                    row["relationship_basis"],
+                )
+                fields = {
+                    k: row.get(k)
+                    for k in (
+                        "controller",
+                        "rack",
+                        "slot",
+                        "channel",
+                        "address",
+                        "description",
+                        "wire_numbers",
+                        "cable",
+                        "cable_core",
+                    )
+                }
+                result[json.dumps(identity)].append({"fields": fields, "sources": row["sources"]})
+            return result
+
+        a, b = channel_index(before), channel_index(after)
+        for key in sorted(a.keys() | b.keys()):
+            old, new = a.get(key, []), b.get(key, [])
+            if sorted(json.dumps(r["fields"], sort_keys=True) for r in old) != sorted(
+                json.dumps(r["fields"], sort_keys=True) for r in new
+            ):
+                changes.append(
+                    {
+                        "kind": "plc_io",
+                        "change": "ambiguous_identity"
+                        if len(old) > 1 or len(new) > 1
+                        else "changed"
+                        if old and new
+                        else "added"
+                        if new
+                        else "removed",
                         "identity": json.loads(key),
                         "before": old,
                         "after": new,

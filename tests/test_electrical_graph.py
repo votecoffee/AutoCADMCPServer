@@ -3,6 +3,7 @@ from autocad_mcp.electrical_graph import (
     add_associations,
     add_drawing_geometry,
     add_signal_links,
+    select_wire_layers,
     trace_graph,
 )
 from autocad_mcp.electrical_model import aliases, drawing_metadata, normalize_instance, physical_entities
@@ -126,3 +127,21 @@ def test_duplicate_signal_sources_do_not_connect():
     ]
     add_signal_links(graph, signals, diagnostics)
     assert not graph.edges and diagnostics[0]["code"] == "ambiguous_signal"
+
+
+def test_native_wire_layer_wildcards_include_color_and_size_layers():
+    doc = {
+        "layers": [{"name": name} for name in ("BLU 18AWG", "BLU_16 AWG", "WHT-BLU 16AWG", "BORDER", "WIRES")]
+    }
+    physical = [
+        {
+            "type": "INSERT",
+            "properties": {"name": "WD_M"},
+            "attributes": [{"tag": "WIRELAYS", "text": "BLU*,WHT*,WIRES"}],
+        }
+    ]
+    layers, basis, unsupported = select_wire_layers(doc, physical, [])
+    assert layers == {"blu 18awg", "blu_16 awg", "wht-blu 16awg", "wires"}
+    assert basis.startswith("WD_M") and unsupported == []
+    physical[0]["attributes"][0]["text"] = "~BORDER"
+    assert select_wire_layers(doc, physical, [])[2] == ["~border"]

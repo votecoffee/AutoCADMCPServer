@@ -193,3 +193,22 @@ def test_report_rejects_duplicate_columns_and_nested_json(tmp_path):
     path.write_text('[{"TAG":"A", "nested":{}}]')
     with pytest.raises(ValueError, match="nested"):
         parse_report(path, "components")
+
+
+def test_documented_from_to_handle_and_sheet_aliases(tmp_path):
+    path = tmp_path / "connections.csv"
+    path.write_text(
+        "CMP1,PIN1,CMPHDL1,SH1,CMP2,PIN2,CMPHDL2,SH2,WIRENO\nPLC1,0,AB,1,PE1,1,CD,2,100\n", encoding="utf-8"
+    )
+    fields = parse_report(path, "from_to")[0]["fields"]
+    assert fields["FROM_TAG"] == "PLC1" and fields["TO_HDL"] == "CD"
+    assert fields["FROM_SH"] == "1" and fields["WIRENO"] == "100"
+
+
+def test_native_drawing_sheet_does_not_use_signal_destination_sheet():
+    doc = document(
+        [entity("10", attrs={"SHEET": "7"}, name="WD_M"), entity("20", attrs={"SHEET": "42"}, name="HA1S1")]
+    )
+    result = drawing_metadata(doc)
+    assert result["sheet"] == "7" and result["sheet_basis"] == "WD_M_drawing_attribute"
+    assert result["sheet_candidates"] == ["42", "7"]

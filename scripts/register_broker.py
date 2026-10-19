@@ -11,6 +11,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--broker-python", required=True)
     parser.add_argument("--broker-state", required=True)
+    parser.add_argument(
+        "--replace", action="store_true", help="Explicitly replace this app's existing autocad registration"
+    )
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
     config = repo / ".local/config.json"
@@ -31,7 +34,7 @@ def main():
         "schema_version": 1,
         "id": "autocad",
         "display_name": "AutoCAD MCP Server",
-        "description": "Local DWG/DXF/PDF extraction: text, attributes, dimensions, layers, references and search.",
+        "description": "Local DWG/DXF/PDF and Electrical project inventory, PLC I/O, tracing, consistency and revision analysis.",
         "transport": {
             "type": "stdio",
             "command": sys.executable,
@@ -44,15 +47,29 @@ def main():
         "timeout_seconds": 300.0,
     }
     if "allowed_write_tools" in fields:
-        manifest["allowed_write_tools"] = ["cad_index_project", "cad_render_preview"]
+        manifest["allowed_write_tools"] = [
+            "cad_index_project",
+            "cad_render_preview",
+            "cad_build_electrical_project",
+            "cad_export_electrical_project",
+            "cad_highlight_source_object",
+        ]
     if "session_mode" in fields:
         manifest["session_mode"] = "transient"
     target = repo / ".local/autocad.service.json"
     target.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    subprocess.run(
-        [args.broker_python, "-m", "universal_tools", "--state", args.broker_state, "register", str(target)],
-        check=True,
-    )
+    command = [
+        args.broker_python,
+        "-m",
+        "universal_tools",
+        "--state",
+        args.broker_state,
+        "register",
+        str(target),
+    ]
+    if args.replace:
+        command.append("--replace")
+    subprocess.run(command, check=True)
     print(
         json.dumps(
             {

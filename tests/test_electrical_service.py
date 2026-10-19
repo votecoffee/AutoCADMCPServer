@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import ezdxf
+import jsonschema
 import pytest
 
 from autocad_mcp.config import Config
@@ -45,6 +46,12 @@ def test_inventory_tracing_export_and_preservation(project):
     assert io["trace"]["paths"][0]["status"] == "interpreted"
     exported = service.export(identifier)
     snapshot = json.loads(Path(exported["path"]).read_text(encoding="utf-8"))
+    schema = json.loads(
+        (Path(__file__).resolve().parents[1] / "schemas/electrical-project.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    jsonschema.validate(snapshot, schema)
     assert exported["readback_verified"] and sha256(Path(exported["path"])) == exported["sha256"]
     assert snapshot["devices"][0]["sources"][0]["drawing"]["sha256"] == before
     assert sha256(root / "a.dxf") == before
@@ -66,6 +73,14 @@ def test_revision_comparison_and_stale_snapshot(project):
     assert diff["total"] == 1 and diff["items"][0]["change"] == "changed"
     assert diff["items"][0]["before"]["fields"]["catalog"] == "S1"
     assert service.compare(after, after)["total"] == 0
+    doc = ezdxf.readfile(root / "a.dxf")
+    doc.modelspace().query("INSERT")[0].get_attrib("TAGA01").dxf.text = "I0.1"
+    doc.saveas(root / "a.dxf")
+    service.drawings.load("test", "a.dxf")
+    next_revision = service.build("test")["project_id"]
+    changes = service.compare(after, next_revision)["items"]
+    assert len(changes) == 1 and changes[0]["kind"] == "plc_io"
+    assert changes[0]["after"][0]["fields"]["address"] == "I0.1"
 
 
 def test_native_plc_report_mapping_and_no_order_guess(project):

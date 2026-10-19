@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import tomllib
 import zipfile
 from pathlib import Path
 
@@ -28,6 +29,8 @@ def selected_files(repo):
     for folder in ("src", "scripts", "tests"):
         files.extend((repo / folder).rglob("*.py"))
     files.append(repo / "examples/config.example.json")
+    for folder, extension in (("docs", "*.md"), ("schemas", "*.json")):
+        files.extend((repo / folder).rglob(extension))
     return sorted(files, key=lambda path: path.relative_to(repo).as_posix())
 
 
@@ -58,7 +61,7 @@ def main():
     files = selected_files(repo)
     manifest = {
         "schema_version": 1,
-        "version": "0.1.0",
+        "version": tomllib.loads((repo / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"],
         "files": {
             path.relative_to(repo).as_posix(): {
                 "sha256": digest(path.read_bytes()),
