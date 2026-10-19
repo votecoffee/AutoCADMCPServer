@@ -40,7 +40,7 @@ DWG conversion uses an independently installed ODA File Converter. DXF parsing u
 - The tested local `universal-codex-tools==0.14.0` development framework wheel. It is a normal pinned Python dependency; no public package feed is shipped yet. MCP is pinned at **2.3.0**; setup rejects an older framework SDK pin instead of downgrading the app. See [framework dependency and verification](docs/shared-app-framework.md#dependency-and-packaging).
 - [ODA File Converter](https://www.opendesign.com/guestfiles/oda_file_converter), installed separately, for DWG extraction. Windows installations are detected under `C:/Program Files/ODA`; an absolute executable path can also be configured. DXF and PDF extraction do not need ODA.
 
-Optional source highlighting requires full AutoCAD running on Windows and pywin32, included in the Windows runtime lock through the MCP dependency. TrueView and ODA do not provide the live operation.
+Optional source highlighting requires full AutoCAD running on Windows and pywin32, included explicitly in the Windows runtime lock. TrueView and ODA do not provide the live operation.
 
 ODA and Autodesk binaries are not redistributed. Python runtime dependencies are installed from the hash-locked requirements file below.
 
