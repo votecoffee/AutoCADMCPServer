@@ -114,19 +114,23 @@ def highlight(service, source: dict, enabled=True):
         encoding="utf-8",
         newline="\n",
     )
-    try:
-        subprocess.run(
-            [sys.executable, "-m", "autocad_mcp", "_highlight", str(request), str(response)],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=30,
-            check=True,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-        result = json.loads(response.read_text(encoding="utf-8"))
-    except subprocess.TimeoutExpired:
-        result = {"status": "unknown", "error": "Highlight worker timed out; inspect AutoCAD before retrying"}
+    with service.coordinator.lock("ui:autocad"), service.coordinator.worker():
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "autocad_mcp", "_highlight", str(request), str(response)],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=30,
+                check=True,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            result = json.loads(response.read_text(encoding="utf-8"))
+        except subprocess.TimeoutExpired:
+            result = {
+                "status": "unknown",
+                "error": "Highlight worker timed out; inspect AutoCAD before retrying",
+            }
     result["source"] = source
     result["audit_path"] = str(response)
     response.write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8", newline="\n")

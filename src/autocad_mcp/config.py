@@ -21,6 +21,11 @@ class Config:
     worker_timeout: int = 120
     max_entities: int = 500_000
     max_pages: int = 2000
+    max_concurrent_requests: int = 4
+    max_queued_requests: int = 32
+    max_worker_processes: int = 4
+    max_oda_processes: int = 1
+    lock_timeout_seconds: int = 180
 
     @classmethod
     def load(cls, filename: str | Path) -> Config:
@@ -41,7 +46,19 @@ class Config:
         executable = Path(oda).resolve(strict=True) if oda else None
         if executable and (not executable.is_file() or not Path(oda).is_absolute()):
             raise ValueError("ODA executable must be an absolute installed file path")
-        return cls(roots, state, executable)
+        concurrency = {}
+        for key, default, low, high in (
+            ("max_concurrent_requests", 4, 1, 32),
+            ("max_queued_requests", 32, 0, 1024),
+            ("max_worker_processes", 4, 1, 16),
+            ("max_oda_processes", 1, 1, 4),
+            ("lock_timeout_seconds", 180, 1, 600),
+        ):
+            value = raw.get(key, default)
+            if type(value) is not int or not low <= value <= high:
+                raise ValueError(f"{key} must be an integer in {low}..{high}")
+            concurrency[key] = value
+        return cls(roots, state, executable, **concurrency)
 
     def resolve(self, root_id: str, relative_path: str) -> Path:
         if root_id not in self.roots:

@@ -4,7 +4,7 @@
 
 Source-preserving local DWG, DXF, PDF and AutoCAD Electrical information extraction for MCP
 
-Extract drawing information through a shared Python service, command line interface and Model Context Protocol server. Version 0.2 adds device and PLC I/O inventories, connection tracing, equipment grouping, documented network inventory, consistency checks, revision comparison and traceable JSON exports. Native report assertions, observed attributes and interpreted drawing content remain distinct. Sources are preserved. An optional guarded operation highlights a source object in an unchanged drawing already open in AutoCAD. The repository is named `AutoCADMCPServer`; the Python distribution uses `autocad-mcp-server` to follow Python package naming conventions.
+Extract drawing information through a shared Python service, command line interface and Model Context Protocol server. Version 0.3 provides concurrent requests, durable write receipts, an independent Codex plugin, and device and PLC I/O inventories, connection tracing, equipment grouping, documented network inventory, consistency checks, revision comparison and traceable JSON exports. Native report assertions, observed attributes and interpreted drawing content remain distinct. Sources are preserved. An optional guarded operation highlights a source object in an unchanged drawing already open in AutoCAD. The repository is named `AutoCADMCPServer`; the Python distribution uses `autocad-mcp-server` to follow Python package naming conventions.
 
 ## Table of Contents
 
@@ -15,6 +15,7 @@ Extract drawing information through a shared Python service, command line interf
   - [CLI](#cli)
   - [Python](#python)
   - [Electrical projects](#electrical-projects)
+  - [Standalone Codex plugin](#standalone-codex-plugin)
   - [Connect through Universal Tools](#connect-through-universal-tools)
   - [Tools](#tools)
 - [Extraction boundaries](#extraction-boundaries)
@@ -116,9 +117,23 @@ Replace IDs with returned values. Omit `--wdp` for ordinary DWG/DXF/PDF roots. U
 
 Python clients use `ElectricalService(service).build("drawings", ...)` from `autocad_mcp.electrical`, then its query, trace, compare and export methods. Keep build options and customer exports under ignored `.local/` or outside the checkout. Snapshot freshness is checked against current input hashes; historical snapshots remain readable for revision comparison.
 
+### Standalone Codex plugin
+
+Install and enable the independent local plugin after configuring drawing roots:
+
+```powershell
+.\InstallAndRun.cmd --install-only --install-plugin
+```
+
+This registers `autocad@autocad-local` using the Codex CLI. The installed plugin starts the app's own stdio MCP server with the configured app environment; no broker or separately running HTTP server is required. It includes the application icon and a drawing-analysis skill. Generated runtime bindings, marketplace files and local paths stay under ignored `.local/codex-marketplace/`. The portable template in `plugins/autocad/` has no personal configuration; its default loopback HTTP connection is replaced by a direct stdio binding during local installation.
+
+Use a new local chat or reload the plugin connection to discover the current tools after installation. The local Codex CLI must be available. `python scripts/install_plugin.py --prepare-only` creates the local package without changing Codex registration. Packaging follows [OpenAI's plugin format](https://developers.openai.com/plugins/build/plugins).
+
+The server admits four active normal requests and 32 queued requests per process by default. Processes sharing app state coordinate a four-worker child-process budget, serialize ODA conversions by default, and serialize AutoCAD UI calls. All state-changing tools accept `request_id` for durable replay and recovery; inspect `cad_get_transaction` after a lost response. Index batches commit per file. See [concurrency and transaction boundaries](docs/concurrency.md).
+
 ### Connect through Universal Tools
 
-Use the existing Universal Tools plugin and broker. This app does not require a separate Codex plugin. With the broker already installed:
+Universal Tools is an optional alternative to the standalone plugin. Use an existing Universal Tools plugin and broker when that integration is preferred. With the broker already installed:
 
 ```powershell
 .venv\Scripts\python.exe scripts\register_broker.py `
@@ -135,6 +150,8 @@ Direct stdio MCP configuration uses the absolute `.venv/Scripts/python.exe` comm
 | Tool | Purpose |
 | --- | --- |
 | `cad_status` | Roots, backends, limits and format support |
+| `cad_concurrency_status` | Active/queued request counts and shared worker limits |
+| `cad_get_transaction` | Durable write status and recorded result by request ID |
 | `cad_list_files` | Recursive paginated inventory, including unsupported formats on request |
 | `cad_inspect` | Metadata, units, layouts, entity/page/text counts and warnings |
 | `cad_get_entities` | Entity properties filtered by type, layout, layer, block or handle |

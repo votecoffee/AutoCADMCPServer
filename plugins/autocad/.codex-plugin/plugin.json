@@ -1,0 +1,29 @@
+{
+  "name": "autocad",
+  "version": "0.3.0",
+  "description": "Extract and trace local CAD and Electrical drawing evidence with AutoCAD MCP Server.",
+  "author": {
+    "name": "votecoffee"
+  },
+  "repository": "https://github.com/votecoffee/AutoCADMCPServer",
+  "license": "MIT",
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "requires_local_executor": true,
+  "interface": {
+    "displayName": "AutoCAD MCP Server",
+    "shortDescription": "Local drawing inventory, PLC I/O and connection tracing",
+    "longDescription": "Source-preserving DWG, DXF, PDF and AutoCAD Electrical analysis with traceable evidence, concurrent requests and durable write receipts.",
+    "developerName": "votecoffee",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/icon.png",
+    "defaultPrompt": [
+      "Extract the device inventory and PLC I/O from my configured drawings."
+    ]
+  }
+}

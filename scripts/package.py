@@ -35,6 +35,9 @@ def selected_files(repo):
     files.append(repo / "examples/config.example.json")
     for folder, extension in (("docs", "*.md"), ("schemas", "*.json")):
         files.extend((repo / folder).rglob(extension))
+    for path in (repo / "plugins" / "autocad").rglob("*"):
+        if path.is_file() and path.suffix.lower() in {".json", ".md", ".png"}:
+            files.append(path)
     return sorted(files, key=lambda path: path.relative_to(repo).as_posix())
 
 

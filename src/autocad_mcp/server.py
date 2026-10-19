@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import json
 from functools import wraps
 from typing import Any
@@ -7,10 +8,14 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
+from .coordination import RequestScheduler
 from .service import DrawingService
+from .transactions import Transactions
 
 
 def create_server(service: DrawingService, port: int = 8796) -> FastMCP:
+    scheduler = RequestScheduler(service.config.max_concurrent_requests, service.config.max_queued_requests)
+    transactions = Transactions(service.config.state, service.coordinator)
     mcp = FastMCP(
         "AutoCAD MCP Server",
         host="127.0.0.1",
@@ -24,20 +29,50 @@ def create_server(service: DrawingService, port: int = 8796) -> FastMCP:
             "Native proxies, native table cells, references and raster-only PDF content may be incomplete. "
             "Electrical analyses distinguish native report assertions, observed attributes and interpretation. "
             "Highlighting changes only the display of an unchanged drawing already open in AutoCAD. "
+            "Use a unique request_id for state-changing operations and cad_get_transaction after a lost response. "
+            "Inspect failed/unknown outcomes before another request; index batches commit per file. "
             "Previews, exports and indexes write only app-owned state. Pagination and truncation fields are explicit."
         ),
     )
 
-    def tool(*, read=True):
+    def tool(*, read=True, control=False):
         def decorate(fn):
             fn.__annotations__["return"] = dict[str, Any]
+            original_signature = inspect.signature(fn)
 
             @wraps(fn)
-            def wrapped(*args, **kwargs):
-                result = fn(*args, **kwargs)
+            async def wrapped(*args, **kwargs):
+                request_id = kwargs.pop("request_id", None) if not read else None
+                bound = original_signature.bind(*args, **kwargs)
+                bound.apply_defaults()
+
+                def execute():
+                    return fn(*args, **kwargs)
+
+                if read:
+                    result = await scheduler.run(execute, control=control)
+                else:
+                    result = await scheduler.run(
+                        transactions.execute, request_id, fn.__name__, dict(bound.arguments), execute
+                    )
                 if len(json.dumps(result, ensure_ascii=False).encode("utf-8")) > 200_000:
                     raise ValueError("Response exceeds budget; use smaller limit or narrower filters")
                 return result
+
+            if not read:
+                wrapped.__signature__ = original_signature.replace(
+                    parameters=[
+                        *original_signature.parameters.values(),
+                        inspect.Parameter(
+                            "request_id", inspect.Parameter.KEYWORD_ONLY, default=None, annotation=str | None
+                        ),
+                    ]
+                )
+                wrapped.__annotations__ = {**fn.__annotations__, "request_id": str | None}
+                wrapped.__doc__ = (
+                    (fn.__doc__ or "")
+                    + "\nOptional request_id provides durable idempotency; inspect cad_get_transaction after a lost response."
+                )
 
             return mcp.tool(
                 structured_output=True,
@@ -48,10 +83,25 @@ def create_server(service: DrawingService, port: int = 8796) -> FastMCP:
 
         return decorate
 
-    @tool()
+    @tool(control=True)
     def cad_status() -> dict:
         """List configured source roots, installed backends, supported formats and extraction limits."""
         return service.status()
+
+    @tool(control=True)
+    def cad_concurrency_status() -> dict:
+        """Inspect per-process request admission, queue and worker limits; control calls remain responsive under load."""
+        return {
+            **scheduler.status(),
+            "shared_worker_process_limit": service.config.max_worker_processes,
+            "shared_oda_process_limit": service.config.max_oda_processes,
+            "autocad_ui": "serialized across processes",
+        }
+
+    @tool(control=True)
+    def cad_get_transaction(request_id: str, include_result: bool = False) -> dict:
+        """Read a durable write receipt/result. An abandoned owner is reported unknown; no operation is retried."""
+        return transactions.get(request_id, include_result)
 
     @tool()
     def cad_list_files(root_id: str, supported_only: bool = True, offset: int = 0, limit: int = 100) -> dict:

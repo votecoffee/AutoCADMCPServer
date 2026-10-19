@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import collections
+import contextlib
 import hashlib
 import json
 import os
@@ -18,6 +19,7 @@ import pymupdf
 
 from . import EXTRACTION_VERSION, __version__
 from .config import SUPPORTED, Config
+from .coordination import Coordinator
 
 
 def sha256(path: Path) -> str:
@@ -77,6 +79,9 @@ def paginate(rows: list, offset: int = 0, limit: int = 100) -> dict:
 class DrawingService:
     def __init__(self, config: Config):
         self.config = config
+        self.coordinator = Coordinator(
+            config.state, config.lock_timeout_seconds, config.max_worker_processes, config.max_oda_processes
+        )
         for name in ("cache", "scratch", "previews"):
             (config.state / name).mkdir(parents=True, exist_ok=True)
         self.signature = hashlib.sha256(
@@ -91,7 +96,8 @@ class DrawingService:
                 sort_keys=True,
             ).encode()
         ).hexdigest()
-        with self.database() as db:
+        with self.coordinator.lock("index-schema"), self.database() as db:
+            db.execute("PRAGMA journal_mode=WAL")
             db.executescript("""
                 CREATE TABLE IF NOT EXISTS documents(
                     root TEXT, path TEXT, sha TEXT, signature TEXT, indexed_at REAL,
@@ -101,11 +107,16 @@ class DrawingService:
                 CREATE INDEX IF NOT EXISTS record_source ON records(root,path);
             """)
 
+    @contextlib.contextmanager
     def database(self):
         db = sqlite3.connect(self.config.state / "index.sqlite3", timeout=30)
         db.execute("PRAGMA busy_timeout=30000")
         db.create_function("CASEFOLD", 1, lambda text: text.casefold())
-        return db
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
 
     def status(self) -> dict:
         return {
@@ -118,6 +129,14 @@ class DrawingService:
             "oda_executable": str(self.config.oda_executable) if self.config.oda_executable else None,
             "engines": {"ezdxf": ezdxf.__version__, "PyMuPDF": pymupdf.VersionBind},
             "extraction_signature": self.signature,
+            "concurrency": {
+                "max_concurrent_requests_per_process": self.config.max_concurrent_requests,
+                "max_queued_requests_per_process": self.config.max_queued_requests,
+                "max_worker_processes_per_state": self.config.max_worker_processes,
+                "max_oda_processes_per_state": self.config.max_oda_processes,
+                "lock_timeout_seconds": self.config.lock_timeout_seconds,
+                "coordination": "Cross-process cache/index/AutoCAD locks; WAL index transactions; atomic snapshots/exports",
+            },
             "limits": {
                 "max_file_bytes": self.config.max_file_bytes,
                 "worker_timeout_seconds": self.config.worker_timeout,
@@ -153,59 +172,15 @@ class DrawingService:
         before = sha256(path)
         cache_key = hashlib.sha256(f"{before}:{extension}:{self.signature}".encode()).hexdigest()
         cached = self.config.state / "cache" / (cache_key + ".json")
-        if cached.exists():
-            data = json.loads(cached.read_text(encoding="utf-8"))
-        else:
-            if cached_only:
-                raise ValueError(
-                    "Current extraction cache is missing; run cad_index_project before electrical analysis"
-                )
-            with tempfile.TemporaryDirectory(dir=self.config.state / "scratch") as folder:
-                scratch = Path(folder)
-                source = scratch / ("source" + extension)
-                shutil.copyfile(path, source)
-                if sha256(source) != before or sha256(path) != before:
-                    raise ValueError("Source changed during snapshot; retry against a stable source")
-                destination = scratch / "extraction.json"
-                options = {
-                    "oda_executable": str(self.config.oda_executable) if self.config.oda_executable else None,
-                    "max_entities": self.config.max_entities,
-                    "max_pages": self.config.max_pages,
-                }
-                args = [
-                    sys.executable,
-                    "-m",
-                    "autocad_mcp",
-                    "_extract",
-                    str(source),
-                    str(destination),
-                    json.dumps(options),
-                ]
-                opts = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
-                try:
-                    # A Windows venv launcher can stall when it inherits the active MCP input pipe.
-                    # Workers take all input through argv/files and must never read that pipe.
-                    completed = subprocess.run(
-                        args,
-                        check=False,
-                        stdin=subprocess.DEVNULL,
-                        capture_output=True,
-                        timeout=self.config.worker_timeout,
-                        encoding="utf-8",
-                        errors="replace",
-                        **opts,
-                    )
-                except subprocess.TimeoutExpired as error:
-                    raise ValueError("Extraction worker timed out; no partial result published") from error
-                if completed.returncode != 0 or not destination.exists():
-                    raise ValueError("Extraction worker failed: " + completed.stderr[-3000:])
-                data = json.loads(destination.read_text(encoding="utf-8"))
-                if sha256(path) != before:
-                    raise ValueError("Source changed during extraction; result discarded")
-                # Concurrent clients can race safely: immutable content key, atomic cache publication.
-                temp = cached.with_name(cached.name + "." + uuid.uuid4().hex + ".tmp")
-                temp.write_text(json.dumps(data, ensure_ascii=False, allow_nan=False), encoding="utf-8")
-                os.replace(temp, cached)
+        if not cached.exists():
+            with self.coordinator.lock("cache:" + cache_key):
+                if not cached.exists():
+                    if cached_only:
+                        raise ValueError(
+                            "Current extraction cache is missing; run cad_index_project before electrical analysis"
+                        )
+                    self._extract_to_cache(path, extension, before, cached)
+        data = json.loads(cached.read_text(encoding="utf-8"))
         if sha256(path) != before:
             raise ValueError("Source changed while reading the cache")
         return {
@@ -218,6 +193,55 @@ class DrawingService:
                 "extraction_signature": self.signature,
             },
         }
+
+    def _extract_to_cache(self, path, extension, before, cached):
+        with tempfile.TemporaryDirectory(dir=self.config.state / "scratch") as folder:
+            scratch = Path(folder)
+            source = scratch / ("source" + extension)
+            shutil.copyfile(path, source)
+            if sha256(source) != before or sha256(path) != before:
+                raise ValueError("Source changed during snapshot; retry against a stable source")
+            destination = scratch / "extraction.json"
+            options = {
+                "oda_executable": str(self.config.oda_executable) if self.config.oda_executable else None,
+                "max_entities": self.config.max_entities,
+                "max_pages": self.config.max_pages,
+            }
+            args = [
+                sys.executable,
+                "-m",
+                "autocad_mcp",
+                "_extract",
+                str(source),
+                str(destination),
+                json.dumps(options),
+            ]
+            opts = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
+            try:
+                # A Windows venv launcher can stall when it inherits the active MCP input pipe.
+                # Workers take all input through argv/files and must never read that pipe.
+                with self.coordinator.worker(native=extension in {".dwg", ".dwt", ".dws"}):
+                    completed = subprocess.run(
+                        args,
+                        check=False,
+                        stdin=subprocess.DEVNULL,
+                        capture_output=True,
+                        timeout=self.config.worker_timeout,
+                        encoding="utf-8",
+                        errors="replace",
+                        **opts,
+                    )
+            except subprocess.TimeoutExpired as error:
+                raise ValueError("Extraction worker timed out; no partial result published") from error
+            if completed.returncode != 0 or not destination.exists():
+                raise ValueError("Extraction worker failed: " + completed.stderr[-3000:])
+            data = json.loads(destination.read_text(encoding="utf-8"))
+            if sha256(path) != before:
+                raise ValueError("Source changed during extraction; result discarded")
+            # Concurrent clients can race safely: immutable content key, atomic cache publication.
+            temp = cached.with_name(cached.name + "." + uuid.uuid4().hex + ".tmp")
+            temp.write_text(json.dumps(data, ensure_ascii=False, allow_nan=False), encoding="utf-8")
+            os.replace(temp, cached)
 
     def inspect(self, root_id: str, relative_path: str) -> dict:
         doc = self.load(root_id, relative_path)
@@ -292,26 +316,7 @@ class DrawingService:
                 break
             relative_path = file["relative_path"]
             try:
-                doc = self.load(root_id, relative_path)
-                with self.database() as db:
-                    db.execute("DELETE FROM records WHERE root=? AND path=?", (root_id, relative_path))
-                    db.executemany(
-                        "INSERT INTO records VALUES(?,?,?,?,?)",
-                        (
-                            (
-                                root_id,
-                                relative_path,
-                                i,
-                                row["text"],
-                                json.dumps({k: v for k, v in row.items() if k != "text"}),
-                            )
-                            for i, row in enumerate(doc["text"])
-                        ),
-                    )
-                    db.execute(
-                        "INSERT OR REPLACE INTO documents VALUES(?,?,?,?,?)",
-                        (root_id, relative_path, doc["source"]["sha256"], self.signature, time.time()),
-                    )
+                doc = self._index_file(root_id, relative_path)
                 results.append(
                     {
                         "path": relative_path,
@@ -329,6 +334,34 @@ class DrawingService:
             "next_offset": offset + len(results) if offset + len(results) < batch["total"] else None,
         }
 
+    def _index_file(self, root_id, relative_path):
+        path = self.config.resolve(root_id, relative_path)
+        with self.coordinator.lock("index:" + root_id + ":" + str(path)):
+            doc = self.load(root_id, relative_path)
+            with self.database() as db:
+                db.execute("BEGIN IMMEDIATE")
+                db.execute("DELETE FROM records WHERE root=? AND path=?", (root_id, relative_path))
+                db.executemany(
+                    "INSERT INTO records VALUES(?,?,?,?,?)",
+                    (
+                        (
+                            root_id,
+                            relative_path,
+                            i,
+                            row["text"],
+                            json.dumps({k: v for k, v in row.items() if k != "text"}),
+                        )
+                        for i, row in enumerate(doc["text"])
+                    ),
+                )
+                db.execute(
+                    "INSERT OR REPLACE INTO documents VALUES(?,?,?,?,?)",
+                    (root_id, relative_path, doc["source"]["sha256"], self.signature, time.time()),
+                )
+                if sha256(self.config.resolve(root_id, relative_path)) != doc["source"]["sha256"]:
+                    raise ValueError("Source changed before index commit; previous index preserved")
+            return doc
+
     def search(self, root_id: str, query: str, offset=0, limit=50) -> dict:
         if not query.strip() or len(query) > 500:
             raise ValueError("Supply a nonempty literal query of at most 500 characters")
@@ -337,6 +370,7 @@ class DrawingService:
         supported = [row for row in all_files if row["supported"]]
         current, stale, missing = {}, [], []
         with self.database() as db:
+            db.execute("BEGIN")
             indexed = {
                 path: (digest, signature)
                 for path, digest, signature in db.execute(
@@ -448,16 +482,17 @@ class DrawingService:
                 ),
             ]
             opts = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
-            result = subprocess.run(
-                args,
-                check=False,
-                stdin=subprocess.DEVNULL,
-                capture_output=True,
-                timeout=self.config.worker_timeout,
-                encoding="utf-8",
-                errors="replace",
-                **opts,
-            )
+            with self.coordinator.worker(native=source.suffix.lower() in {".dwg", ".dwt", ".dws"}):
+                result = subprocess.run(
+                    args,
+                    check=False,
+                    stdin=subprocess.DEVNULL,
+                    capture_output=True,
+                    timeout=self.config.worker_timeout,
+                    encoding="utf-8",
+                    errors="replace",
+                    **opts,
+                )
             if result.returncode or not target.exists():
                 raise ValueError("Preview failed: " + result.stderr[-3000:])
         if sha256(source) != source_doc["source"]["sha256"]:
@@ -483,24 +518,25 @@ class DrawingService:
             if sha256(staged) != doc["source"]["sha256"]:
                 raise ValueError("Source changed before table detection")
             opts = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "autocad_mcp",
-                    "_tables",
-                    str(staged),
-                    str(destination),
-                    json.dumps({"page": page}),
-                ],
-                check=False,
-                stdin=subprocess.DEVNULL,
-                capture_output=True,
-                timeout=self.config.worker_timeout,
-                encoding="utf-8",
-                errors="replace",
-                **opts,
-            )
+            with self.coordinator.worker():
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        "-m",
+                        "autocad_mcp",
+                        "_tables",
+                        str(staged),
+                        str(destination),
+                        json.dumps({"page": page}),
+                    ],
+                    check=False,
+                    stdin=subprocess.DEVNULL,
+                    capture_output=True,
+                    timeout=self.config.worker_timeout,
+                    encoding="utf-8",
+                    errors="replace",
+                    **opts,
+                )
             if result.returncode or not destination.exists():
                 raise ValueError("PDF table worker failed: " + result.stderr[-3000:])
             rows = json.loads(destination.read_text(encoding="utf-8"))

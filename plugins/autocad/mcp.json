@@ -1,0 +1,6 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "autocad": {"type": "streamable-http", "url": "http://127.0.0.1:8796/mcp"}
+  }
+}

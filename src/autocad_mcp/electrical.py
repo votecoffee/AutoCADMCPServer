@@ -437,7 +437,14 @@ class ElectricalService:
         for source in inputs:
             if sha256(self.config.resolve(source["root_id"], source["relative_path"])) != source["sha256"]:
                 raise ValueError("An input changed during project analysis; rebuild from current index")
-        atomic_json(self.state / "projects" / (identifier + ".json"), snapshot)
+        snapshot["checks"].sort(key=lambda row: json.dumps(row, sort_keys=True))
+        destination = self.state / "projects" / (identifier + ".json")
+        with self.drawings.coordinator.lock("project:" + identifier):
+            if destination.exists():
+                if json.loads(destination.read_text(encoding="utf-8")) != snapshot:
+                    raise ValueError("Immutable project identity conflict; existing snapshot preserved")
+            else:
+                atomic_json(destination, snapshot)
         return self.summary(snapshot)
 
     def load(self, project_id):

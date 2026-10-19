@@ -23,6 +23,9 @@ def main():
         "--install-only", action="store_true", help="Install and validate configuration without starting"
     )
     parser.add_argument("--stdio", action="store_true", help="Use MCP stdio instead of loopback HTTP")
+    parser.add_argument(
+        "--install-plugin", action="store_true", help="Install the standalone local Codex plugin"
+    )
     parser.add_argument("--port", type=int, default=8796, help="Loopback HTTP port (default: 8796)")
     parser.add_argument(
         "--root", action="append", help="First setup only: alias=absolute drawing directory (repeatable)"
@@ -96,6 +99,8 @@ def main():
     install([str(python), "-m", "autocad_mcp", "--config", str(config), "status"])
     if not args.stdio:
         install([str(python), str(REPO / "scripts" / "create_shortcut.py")])
+    if args.install_plugin:
+        install([str(python), str(REPO / "scripts" / "install_plugin.py")])
     if args.install_only:
         print("Installation and configuration verified.", file=sys.stderr)
         return 0

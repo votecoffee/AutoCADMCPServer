@@ -1,5 +1,10 @@
 {
   "roots": {"drawings": "C:\\Engineering\\Drawings"},
   "state_dir": "C:\\Engineering\\AutoCADMCPState",
-  "oda_executable": "C:\\Program Files\\ODA\\ODAFileConverter 25.12.0\\ODAFileConverter.exe"
+  "oda_executable": "C:\\Program Files\\ODA\\ODAFileConverter 25.12.0\\ODAFileConverter.exe",
+  "max_concurrent_requests": 4,
+  "max_queued_requests": 32,
+  "max_worker_processes": 4,
+  "max_oda_processes": 1,
+  "lock_timeout_seconds": 180
 }
