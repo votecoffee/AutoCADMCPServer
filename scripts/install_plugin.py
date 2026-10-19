@@ -20,10 +20,10 @@ FILES = (
 )
 
 
-def prepare(repo: Path):
+def prepare(repo: Path, config: Path | None = None):
     repo = repo.resolve()
     template = repo / "plugins" / "autocad"
-    config = (repo / ".local" / "config.json").resolve(strict=True)
+    config = (config or repo / ".local" / "config.json").resolve(strict=True)
     python = repo / ".venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
     if not python.is_file():
         raise ValueError("Run InstallAndRun.cmd --install-only first")
@@ -87,9 +87,26 @@ def main():
     parser.add_argument(
         "--prepare-only", action="store_true", help="Prepare local bindings without registering in Codex"
     )
+    parser.add_argument(
+        "--mode",
+        choices=["auto", "standalone", "broker", "none"],
+        default="standalone",
+        help="Auto preserves existing choices and prefers only an accepted broker route",
+    )
+    parser.add_argument("--config", type=Path, help="Use this app configuration in the generated binding")
     args = parser.parse_args()
-    result = prepare(Path(__file__).resolve().parents[1])
-    if not args.prepare_only:
+    repo = Path(__file__).resolve().parents[1]
+    config = (args.config or repo / ".local/config.json").resolve(strict=True)
+    from autocad_mcp.electrical import atomic_json
+    from autocad_mcp.integration import integration_plan
+
+    if args.prepare_only:
+        print(json.dumps(prepare(repo, config)))
+        return
+    plan = integration_plan(repo, config, args.mode)
+    result = dict(plan)
+    if plan["action"] == "install":
+        result.update(prepare(repo, config))
         codex = shutil.which("codex")
         if not codex:
             raise ValueError("Codex CLI was not found; local plugin prepared but not registered")
@@ -98,6 +115,8 @@ def main():
         )
         subprocess.run([codex, "plugin", "add", result["plugin"], "--json"], check=True, stdout=sys.stderr)
         result["registration_requested"] = True
+    if plan["action"] != "defer":
+        atomic_json(repo / ".local/codex-integration.json", {"schema_version": 1, **plan})
     print(json.dumps(result))
 
 

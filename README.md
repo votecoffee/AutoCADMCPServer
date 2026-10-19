@@ -53,7 +53,9 @@ For Windows setup and a foreground server, run `InstallAndRun.cmd` in the projec
 .\InstallAndRun.cmd --stdio
 ```
 
-For unattended first setup, use `InstallAndRun.cmd --root "drawings=C:\Engineering\Drawings" --install-only`; repeat `--root` for multiple roots. Setup creates `AutoCAD MCP Server.lnk` in the project root using the bundled application icon; double-click this shortcut for the icon-bearing launcher. The shortcut contains local paths, is ignored by Git, and is recreated for each checkout. `--stdio` keeps setup messages on stderr for MCP clients and does not prompt or create a shortcut. Keep the server window open and press Ctrl+C to stop. The existing Universal Tools integration starts its own stdio process and does not need a separate foreground HTTP server.
+For unattended first setup, use `InstallAndRun.cmd --root "drawings=C:\Engineering\Drawings" --install-only`; repeat `--root` for multiple roots. Setup creates `AutoCAD MCP Server.lnk` in the project root using the bundled application icon; double-click this shortcut for the icon-bearing launcher. The shortcut contains local paths, is ignored by Git, and is recreated for each checkout. `--stdio` keeps setup messages on stderr for MCP clients and does not prompt, create a shortcut or change Codex integration implicitly. Keep the server window open and press Ctrl+C to stop. Either Codex integration starts its own stdio process and does not need a separate foreground HTTP server.
+
+Setup defaults to `--codex-integration auto`. It preserves saved choices and existing app plugins, including disabled plugins. On a fresh integration it installs the standalone plugin unless an enabled Universal Tools plugin has a current accepted AutoCAD registration and workflow assessment. An absent CLI or unreadable plugin inventory defers optional integration while leaving the application usable. Use `--codex-integration none` to skip integration or `--install-plugin` to explicitly install standalone even when Universal Tools is available. See [Codex integration selection](docs/codex-integrations.md).
 
 For manual installation in PowerShell:
 
@@ -119,7 +121,7 @@ Python clients use `ElectricalService(service).build("drawings", ...)` from `aut
 
 ### Standalone Codex plugin
 
-Install and enable the independent local plugin after configuring drawing roots:
+The application continues shipping its independent plugin after broker adoption. Explicitly install or restore it after configuring drawing roots:
 
 ```powershell
 .\InstallAndRun.cmd --install-only --install-plugin
@@ -133,7 +135,7 @@ The server admits four active normal requests and 32 queued requests per process
 
 ### Connect through Universal Tools
 
-Universal Tools is an optional alternative to the standalone plugin. Use an existing Universal Tools plugin and broker when that integration is preferred. With the broker already installed:
+Universal Tools is an optional integration route to the same app-owned services. The app and its standalone plugin continue to work independently. With a compatible broker already installed, explicitly register the app:
 
 ```powershell
 .venv\Scripts\python.exe scripts\register_broker.py `
@@ -141,7 +143,11 @@ Universal Tools is an optional alternative to the standalone plugin. Use an exis
   --broker-state 'C:\Tools\CodexMCPBroker\.local'
 ```
 
-Then call Universal Tools `refresh_services`, search for `autocad`, describe the chosen tool and invoke it with its catalog revision. Registration preserves other services and refuses an existing `autocad` registration unless `--replace` is supplied. The installer inspects the installed broker schema and supports the older version-1 descriptor. Newer brokers receive an exact write allowlist. Older brokers use their service-wide write flag; five operations are write-classified: indexing, preview creation, electrical snapshot building, JSON export and AutoCAD UI highlighting. Only highlighting affects the running CAD display; file outputs are limited to app state.
+Then call Universal Tools `refresh_services`, search for `autocad`, read `describe_service` for the app's complete workflow guidance, describe the chosen tool and invoke it with its catalog revision. Registration preserves other services and refuses an existing `autocad` registration unless `--replace` is supplied. It requires the broker's exact write allowlist, transient session and resource identity fields; it refuses a legacy runtime instead of broadening policy. `--prepare-only` validates a descriptor without registering. The default allowlist covers indexing, previews, snapshot building and JSON export. `--include-highlighting` explicitly adds the guarded AutoCAD display operation. File outputs stay in app state.
+
+Registration does not accept migration or remove the direct integration. Keep existing plugins in place until adapter and Codex host checks pass. After a local assessment is accepted, `--codex-integration broker` explicitly records that route; fresh automatic installations can prefer it without installing the standalone plugin. Upgrades preserve the selected route. Full guidance is carried in MCP initialization and exposed by broker `describe_service`; catalogs do not install the app's skill. The bundled skill also documents both routes. See [assessment and coexistence](docs/codex-integrations.md).
+
+Keep one route throughout a workflow. Broker writes need an outer broker request ID and an app request ID inside `arguments`; their journals have different replay behavior. Never retry an uncertain broker operation through the standalone plugin. Broker calls to one service remain serialized, while direct MCP requests can run concurrently under app limits. Both routes coordinate through the same state-directory locks.
 
 Direct stdio MCP configuration uses the absolute `.venv/Scripts/python.exe` command with arguments `['-m', 'autocad_mcp', '--config', 'ABSOLUTE_CONFIG_PATH', 'serve']` and the checkout as working directory. No shell invocation is needed.
 

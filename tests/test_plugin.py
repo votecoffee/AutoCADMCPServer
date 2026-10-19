@@ -37,3 +37,9 @@ def test_plugin_binding_is_local_independent_and_relocatable(tmp_path):
         == "streamable-http"
     )
     assert prepare(repo)["package"] == str(package)
+    alternate = repo / ".local/alternate.json"
+    alternate.write_bytes(config.read_bytes())
+    alternate_package = Path(prepare(repo, alternate)["package"])
+    assert alternate_package != package
+    alternate_binding = json.loads((alternate_package / "mcp.json").read_text())
+    assert str(alternate) in alternate_binding["mcpServers"]["autocad"]["args"]

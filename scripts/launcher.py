@@ -24,13 +24,21 @@ def main():
     )
     parser.add_argument("--stdio", action="store_true", help="Use MCP stdio instead of loopback HTTP")
     parser.add_argument(
-        "--install-plugin", action="store_true", help="Install the standalone local Codex plugin"
+        "--install-plugin", action="store_true", help="Explicitly install the standalone Codex plugin"
+    )
+    parser.add_argument(
+        "--codex-integration",
+        choices=["auto", "standalone", "broker", "none"],
+        default=None,
+        help="Default: auto for setup, none for --stdio; preserves saved choices",
     )
     parser.add_argument("--port", type=int, default=8796, help="Loopback HTTP port (default: 8796)")
     parser.add_argument(
         "--root", action="append", help="First setup only: alias=absolute drawing directory (repeatable)"
     )
     args = parser.parse_args()
+    if args.install_plugin and args.codex_integration not in {None, "standalone"}:
+        parser.error("--install-plugin selects standalone; do not combine with another integration mode")
     if sys.version_info < (3, 11):
         parser.error("Python 3.11 or newer is required")
     if not 1 <= args.port <= 65535:
@@ -99,8 +107,21 @@ def main():
     install([str(python), "-m", "autocad_mcp", "--config", str(config), "status"])
     if not args.stdio:
         install([str(python), str(REPO / "scripts" / "create_shortcut.py")])
+    integration = args.codex_integration or ("none" if args.stdio else "auto")
     if args.install_plugin:
-        install([str(python), str(REPO / "scripts" / "install_plugin.py")])
+        integration = "standalone"
+    # Protocol startup must not alter installation routing implicitly.
+    if integration != "none" or args.codex_integration == "none":
+        install(
+            [
+                str(python),
+                str(REPO / "scripts" / "install_plugin.py"),
+                "--mode",
+                integration,
+                "--config",
+                str(config),
+            ]
+        )
     if args.install_only:
         print("Installation and configuration verified.", file=sys.stderr)
         return 0
