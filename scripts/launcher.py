@@ -94,6 +94,8 @@ def main():
     elif args.root:
         parser.error("Existing configuration preserved. Edit .local/config.json to change roots")
     install([str(python), "-m", "autocad_mcp", "--config", str(config), "status"])
+    if not args.stdio:
+        install([str(python), str(REPO / "scripts" / "create_shortcut.py")])
     if args.install_only:
         print("Installation and configuration verified.", file=sys.stderr)
         return 0

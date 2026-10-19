@@ -7,8 +7,8 @@
       "bytes": 99
     },
     ".gitignore": {
-      "sha256": "00419f45e90cf541018fe878dc86be6fde1d392d01c1529ddd98297d21a26c24",
-      "bytes": 80
+      "sha256": "dea7456345dd1c68f1d59928a6e41cfa342cfa894c5037487079f14964ffb7d4",
+      "bytes": 129
     },
     "AGENTS.md": {
       "sha256": "8d2d5c4d5b4349381c949438ca05a843a9f51462c8264fc49e4eba82ca6ef934",
@@ -23,12 +23,24 @@
       "bytes": 1067
     },
     "README.md": {
-      "sha256": "6b354f447f6173ede7de305d17a1877e5f345ec3aaa0e2fe5f8e68dd714c3111",
-      "bytes": 16615
+      "sha256": "22cb5d7a4e57dd475fdbe157d26aae36bab75bfdcab64305e4996e9908acbd19",
+      "bytes": 16964
     },
     "VERIFICATION.md": {
       "sha256": "f7d387b9a0a3e65421b924994d6180d656bf57bf8e8c2ccaa6957f39be0b06f7",
       "bytes": 3851
+    },
+    "assets/README.md": {
+      "sha256": "8ea890834e8eaebd9855310d405310d4d4ef2437f1decd31513d4e844dd8b913",
+      "bytes": 503
+    },
+    "assets/autocad.ico": {
+      "sha256": "efca7225c6f7acfc060785d2cb615fc8da0abf9f9042204beeee8beb7729a18e",
+      "bytes": 68687
+    },
+    "assets/autocad.png": {
+      "sha256": "d880fc4cfae98f5b0e5a54e09bc441f1cf417d8b41626ddde616ed0d0f19f692",
+      "bytes": 45025
     },
     "docs/electrical-data.md": {
       "sha256": "ccceb6580b9725a341401033479a66e1fe02e0e9ecb9b9647c9e175b5c0a3a70",
@@ -58,13 +70,17 @@
       "sha256": "d5e332af792645effae4a3e75c9301e4564a22b467a36b04fb068583e46273d3",
       "bytes": 2421
     },
+    "scripts/create_shortcut.py": {
+      "sha256": "f5559f933b9c75ae05e04907afdc4a6d14ffccfe9ff4300fd7dbb08dc3f26b13",
+      "bytes": 2010
+    },
     "scripts/launcher.py": {
-      "sha256": "4d186a05bfda48812213021e1df81ca331e75c15f54b6ea4e6d813e51d2d1915",
-      "bytes": 4908
+      "sha256": "1f51b52a17caa3d906f79cceb7786b8221e10c18f4fb7b6496bc12cbf406c02a",
+      "bytes": 5008
     },
     "scripts/package.py": {
-      "sha256": "48f04e64c38532c207ddf7ca4c0824056519c04532cc091b4e0822a736b95174",
-      "bytes": 3610
+      "sha256": "daa82d966b6d089337e88b2eb62465bf81cd8958b96b0364c9f8a611a45b4335",
+      "bytes": 3686
     },
     "scripts/protocol_smoke.py": {
       "sha256": "851a815d21e16ed2c1c5d0c942718e10245aa98abf80cc8e652853669eceb341",

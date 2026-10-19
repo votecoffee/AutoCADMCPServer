@@ -1,5 +1,7 @@
 # AutoCAD MCP Server _(AutoCADMCPServer)_
 
+<img src="assets/autocad.png" width="96" height="96" alt="AutoCAD MCP Server icon">
+
 Source-preserving local DWG, DXF, PDF and AutoCAD Electrical information extraction for MCP
 
 Extract drawing information through a shared Python service, command line interface and Model Context Protocol server. Version 0.2 adds device and PLC I/O inventories, connection tracing, equipment grouping, documented network inventory, consistency checks, revision comparison and traceable JSON exports. Native report assertions, observed attributes and interpreted drawing content remain distinct. Sources are preserved. An optional guarded operation highlights a source object in an unchanged drawing already open in AutoCAD. The repository is named `AutoCADMCPServer`; the Python distribution uses `autocad-mcp-server` to follow Python package naming conventions.
@@ -50,7 +52,7 @@ For Windows setup and a foreground server, run `InstallAndRun.cmd` in the projec
 .\InstallAndRun.cmd --stdio
 ```
 
-For unattended first setup, use `InstallAndRun.cmd --root "drawings=C:\Engineering\Drawings" --install-only`; repeat `--root` for multiple roots. `--stdio` keeps setup messages on stderr for MCP clients and does not prompt. Keep the server window open and press Ctrl+C to stop. The existing Universal Tools integration starts its own stdio process and does not need a separate foreground HTTP server.
+For unattended first setup, use `InstallAndRun.cmd --root "drawings=C:\Engineering\Drawings" --install-only`; repeat `--root` for multiple roots. Setup creates `AutoCAD MCP Server.lnk` in the project root using the bundled application icon; double-click this shortcut for the icon-bearing launcher. The shortcut contains local paths, is ignored by Git, and is recreated for each checkout. `--stdio` keeps setup messages on stderr for MCP clients and does not prompt or create a shortcut. Keep the server window open and press Ctrl+C to stop. The existing Universal Tools integration starts its own stdio process and does not need a separate foreground HTTP server.
 
 For manual installation in PowerShell:
 

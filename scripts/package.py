@@ -18,6 +18,9 @@ ROOT_FILES = (
     "pyproject.toml",
     "requirements-lock.txt",
     "requirements-dev-lock.txt",
+    "assets/autocad.ico",
+    "assets/autocad.png",
+    "assets/README.md",
 )
 
 
