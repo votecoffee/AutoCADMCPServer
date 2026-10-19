@@ -1,0 +1,129 @@
+"""Windows CMD bootstrap: keep the environment and private state inside this checkout."""
+
+from __future__ import annotations
+
+import argparse
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[1]
+
+
+def install(command):
+    # stdout belongs to the MCP protocol in --stdio mode, including during setup.
+    subprocess.run(command, cwd=REPO, stdout=sys.stderr, stderr=sys.stderr, check=True)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Install dependencies locally and run AutoCAD MCP Server")
+    parser.add_argument(
+        "--install-only", action="store_true", help="Install and validate configuration without starting"
+    )
+    parser.add_argument("--stdio", action="store_true", help="Use MCP stdio instead of loopback HTTP")
+    parser.add_argument("--port", type=int, default=8796, help="Loopback HTTP port (default: 8796)")
+    parser.add_argument(
+        "--root", action="append", help="First setup only: alias=absolute drawing directory (repeatable)"
+    )
+    args = parser.parse_args()
+    if sys.version_info < (3, 11):
+        parser.error("Python 3.11 or newer is required")
+    if not 1 <= args.port <= 65535:
+        parser.error("--port must be 1..65535")
+    environment = REPO / ".venv"
+    python = environment / "Scripts" / "python.exe"
+    uv = shutil.which("uv")
+    if not python.exists():
+        print("Creating the application environment in .venv ...", file=sys.stderr)
+        import venv
+
+        venv.EnvBuilder(with_pip=not bool(uv)).create(environment)
+    print("Installing locked dependencies and the application ...", file=sys.stderr)
+    if uv:
+        install(
+            [
+                uv,
+                "pip",
+                "install",
+                "--python",
+                str(python),
+                "--require-hashes",
+                "-r",
+                str(REPO / "requirements-lock.txt"),
+            ]
+        )
+        install([uv, "pip", "install", "--python", str(python), "--no-deps", "-e", str(REPO)])
+    else:
+        probe = subprocess.run(
+            [str(python), "-m", "pip", "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        if probe.returncode:
+            install([str(python), "-m", "ensurepip", "--upgrade"])
+        install(
+            [
+                str(python),
+                "-m",
+                "pip",
+                "install",
+                "--require-hashes",
+                "-r",
+                str(REPO / "requirements-lock.txt"),
+            ]
+        )
+        install([str(python), "-m", "pip", "install", "--no-deps", "-e", str(REPO)])
+    config = Path(os.environ.get("AUTOCAD_MCP_CONFIG") or REPO / ".local" / "config.json").resolve()
+    if not config.exists():
+        if config != (REPO / ".local" / "config.json").resolve():
+            parser.error("AUTOCAD_MCP_CONFIG does not name an existing configuration")
+        roots = args.root
+        if not roots:
+            if args.stdio or not sys.stdin.isatty():
+                parser.error(
+                    'No configuration. Run InstallAndRun.cmd --root "drawings=C:\\Engineering\\Drawings" --install-only first'
+                )
+            directory = input("Drawing folder (full path): ").strip().strip('"')
+            if not directory:
+                parser.error("A drawing folder is required for first setup")
+            roots = ["drawings=" + directory]
+        command = [str(python), str(REPO / "scripts" / "configure.py")]
+        for root in roots:
+            command.extend(["--root", root])
+        install(command)
+    elif args.root:
+        parser.error("Existing configuration preserved. Edit .local/config.json to change roots")
+    install([str(python), "-m", "autocad_mcp", "--config", str(config), "status"])
+    if args.install_only:
+        print("Installation and configuration verified.", file=sys.stderr)
+        return 0
+    transport = "stdio" if args.stdio else "streamable-http"
+    if not args.stdio:
+        print(f"Starting AutoCAD MCP Server at http://127.0.0.1:{args.port}/mcp", file=sys.stderr)
+        print("Keep this window open. Press Ctrl+C to stop.", file=sys.stderr)
+    return subprocess.call(
+        [
+            str(python),
+            "-m",
+            "autocad_mcp",
+            "--config",
+            str(config),
+            "serve",
+            "--transport",
+            transport,
+            "--port",
+            str(args.port),
+        ],
+        cwd=REPO,
+    )
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except subprocess.CalledProcessError as error:
+        print(f"Installation failed (exit {error.returncode}). See the output above.", file=sys.stderr)
+        raise SystemExit(error.returncode or 1)
+    except KeyboardInterrupt:
+        print("Server stopped.", file=sys.stderr)
+        raise SystemExit(130)

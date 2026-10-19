@@ -14,17 +14,21 @@
       "sha256": "8d2d5c4d5b4349381c949438ca05a843a9f51462c8264fc49e4eba82ca6ef934",
       "bytes": 1261
     },
+    "InstallAndRun.cmd": {
+      "sha256": "36ec1ca54824da6884614f60b5dc95c581048997322dbb89a0070ed58f34d0a8",
+      "bytes": 754
+    },
     "LICENSE": {
       "sha256": "9fdbc8c41abf794f69c3488f463798e06338bf90ebefbe2daee329d217c83d44",
       "bytes": 1067
     },
     "README.md": {
-      "sha256": "693d15113513480025f52ef62b6acc5ed1347d96f0652fcb8c3fd1a3b00f80e8",
-      "bytes": 15569
+      "sha256": "6b354f447f6173ede7de305d17a1877e5f345ec3aaa0e2fe5f8e68dd714c3111",
+      "bytes": 16615
     },
     "VERIFICATION.md": {
-      "sha256": "dbe5398883d0c15b31bc5b60b0588623da389397d6ed45d103c81a05cddbb515",
-      "bytes": 3393
+      "sha256": "f7d387b9a0a3e65421b924994d6180d656bf57bf8e8c2ccaa6957f39be0b06f7",
+      "bytes": 3851
     },
     "docs/electrical-data.md": {
       "sha256": "ccceb6580b9725a341401033479a66e1fe02e0e9ecb9b9647c9e175b5c0a3a70",
@@ -54,9 +58,13 @@
       "sha256": "d5e332af792645effae4a3e75c9301e4564a22b467a36b04fb068583e46273d3",
       "bytes": 2421
     },
+    "scripts/launcher.py": {
+      "sha256": "4d186a05bfda48812213021e1df81ca331e75c15f54b6ea4e6d813e51d2d1915",
+      "bytes": 4908
+    },
     "scripts/package.py": {
-      "sha256": "e3df2bf8d97fc49c8c6f9cf46d6f43d2c002640074b0315b605cd06ddeb8d07b",
-      "bytes": 3585
+      "sha256": "48f04e64c38532c207ddf7ca4c0824056519c04532cc091b4e0822a736b95174",
+      "bytes": 3610
     },
     "scripts/protocol_smoke.py": {
       "sha256": "851a815d21e16ed2c1c5d0c942718e10245aa98abf80cc8e652853669eceb341",

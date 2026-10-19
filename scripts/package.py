@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT_FILES = (
     ".gitattributes",
+    "InstallAndRun.cmd",
     "README.md",
     "VERIFICATION.md",
     "AGENTS.md",

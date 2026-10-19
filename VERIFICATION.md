@@ -12,6 +12,8 @@ Run from the checkout with its Python environment. No customer or native CAD fil
 
 The tests construct their own DXF and PDF fixtures. They verify geometry and dimensions, inserted attributes, text locations, source preservation, corrupt-input failure, root boundaries, cache/index freshness, coverage, comparison multiplicities, payload pagination, table cells, CAD/PDF previews, tool annotations and structured output schemas. Electrical tests cover nested transforms, split tags, ordinary aliases, WDP membership, native report fields/FILETIME mapping, unresolved provenance, same-pin terminal tracing, nonconductive associations, T joins, crossing/dot rules, signal ambiguity, domain/budget bounds, historical comparison and export readback. AutoCAD tests use mock COM objects to verify preconditions and rejection before UI changes; they do not establish live AutoCAD acceptance. A real stdio test exercises uncached PDF/DXF extraction, electrical endpoints and table workers to detect Windows worker startup failures that cached calls would miss.
 
+For the Windows launcher, run `InstallAndRun.cmd --install-only`, then check a real MCP handshake over its default HTTP transport and `--stdio`. First-install checks should use a separate extracted checkout and source folder, including paths with spaces; verify that `.venv` is created inside that checkout and that existing configuration remains unchanged. Installation output must stay on stderr in stdio mode. `--port 0` must return a nonzero exit code.
+
 For a configured local corpus, exercise the real stdio protocol, initialization, discovery and extraction:
 
 ```powershell

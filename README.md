@@ -39,7 +39,20 @@ Optional source highlighting requires full AutoCAD running on Windows and pywin3
 
 ODA and Autodesk binaries are not redistributed. Python runtime dependencies are installed from the hash-locked requirements file below.
 
-In PowerShell:
+From a checkout on Windows:
+
+For Windows setup and a foreground server, run `InstallAndRun.cmd` in the project root. It creates or reuses this checkout's `.venv`, installs hash-locked dependencies and the application, preserves existing configuration, and starts loopback MCP HTTP at `http://127.0.0.1:8796/mcp`. On first setup it prompts for a drawing folder. Python 3.11 or newer is required; `uv` is used when available, with pip as the fallback. ODA is still installed separately.
+
+```powershell
+.\InstallAndRun.cmd
+.\InstallAndRun.cmd --install-only
+.\InstallAndRun.cmd --port 8797
+.\InstallAndRun.cmd --stdio
+```
+
+For unattended first setup, use `InstallAndRun.cmd --root "drawings=C:\Engineering\Drawings" --install-only`; repeat `--root` for multiple roots. `--stdio` keeps setup messages on stderr for MCP clients and does not prompt. Keep the server window open and press Ctrl+C to stop. The existing Universal Tools integration starts its own stdio process and does not need a separate foreground HTTP server.
+
+For manual installation in PowerShell:
 
 ```powershell
 git clone https://github.com/votecoffee/AutoCADMCPServer.git
