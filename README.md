@@ -4,7 +4,7 @@
 
 Source-preserving local DWG, DXF, PDF and AutoCAD Electrical information extraction for MCP
 
-Extract drawing information through a shared Python service, command line interface and Model Context Protocol server. Version 0.3 provides concurrent requests, durable write receipts, an independent Codex plugin, and device and PLC I/O inventories, connection tracing, equipment grouping, documented network inventory, consistency checks, revision comparison and traceable JSON exports. Native report assertions, observed attributes and interpreted drawing content remain distinct. Sources are preserved. An optional guarded operation highlights a source object in an unchanged drawing already open in AutoCAD. The repository is named `AutoCADMCPServer`; the Python distribution uses `autocad-mcp-server` to follow Python package naming conventions.
+Extract drawing information through a shared Python service, command line interface and Model Context Protocol server. Device and PLC I/O inventories, connection tracing, equipment grouping, documented network inventory, consistency checks, revision comparison and JSON exports retain source evidence. Version 0.4 adds an experimental app-owned shared-framework host with stable discovery/invocation schemas and versioned backend publications, while retaining the independent standalone plugin and legacy native endpoint. Universal Tools remains optional. Native report assertions, observed attributes and interpretation stay distinct. Sources are preserved; optional guarded highlighting affects an unchanged drawing already open in AutoCAD. The repository is named `AutoCADMCPServer`; the Python distribution is `autocad-mcp-server`.
 
 ## Table of Contents
 
@@ -15,6 +15,7 @@ Extract drawing information through a shared Python service, command line interf
   - [CLI](#cli)
   - [Python](#python)
   - [Electrical projects](#electrical-projects)
+  - [Shared app framework](#shared-app-framework)
   - [Standalone Codex plugin](#standalone-codex-plugin)
   - [Connect through Universal Tools](#connect-through-universal-tools)
   - [Tools](#tools)
@@ -36,6 +37,7 @@ DWG conversion uses an independently installed ODA File Converter. DXF parsing u
 ### Dependencies
 
 - [Python](https://www.python.org/downloads/) 3.11 or later. The PowerShell examples use Python 3.13.
+- The tested local `universal-codex-tools==0.14.0` development framework wheel. It is a normal pinned Python dependency; no public package feed is shipped yet. MCP is pinned at **2.3.0**; setup rejects an older framework SDK pin instead of downgrading the app. See [framework dependency and verification](docs/shared-app-framework.md#dependency-and-packaging).
 - [ODA File Converter](https://www.opendesign.com/guestfiles/oda_file_converter), installed separately, for DWG extraction. Windows installations are detected under `C:/Program Files/ODA`; an absolute executable path can also be configured. DXF and PDF extraction do not need ODA.
 
 Optional source highlighting requires full AutoCAD running on Windows and pywin32, included in the Windows runtime lock through the MCP dependency. TrueView and ODA do not provide the live operation.
@@ -44,16 +46,17 @@ ODA and Autodesk binaries are not redistributed. Python runtime dependencies are
 
 From a checkout on Windows:
 
-For Windows setup and a foreground server, run `InstallAndRun.cmd` in the project root. It creates or reuses this checkout's `.venv`, installs hash-locked dependencies and the application, preserves existing configuration, and starts loopback MCP HTTP at `http://127.0.0.1:8796/mcp`. On first setup it prompts for a drawing folder. Python 3.11 or newer is required; `uv` is used when available, with pip as the fallback. ODA is still installed separately.
+For Windows setup and a foreground compatibility server, run `InstallAndRun.cmd` in the project root. On the first 0.4 setup, supply `--framework-wheel PATH`; the verified wheel is cached privately for subsequent installs. Setup creates or reuses this checkout's `.venv`, installs hash-locked dependencies and the application, preserves existing configuration, and starts legacy loopback MCP HTTP at `http://127.0.0.1:8796/mcp`. On first setup it prompts for a drawing folder. Python 3.11 or newer is required; `uv` is used when available, with pip as the fallback. ODA is installed separately. Framework source alignment does not automatically select its new host for an installed workflow.
 
 ```powershell
+.\InstallAndRun.cmd --framework-wheel 'C:\Packages\universal_codex_tools-0.14.0-py3-none-any.whl' --install-only
 .\InstallAndRun.cmd
 .\InstallAndRun.cmd --install-only
 .\InstallAndRun.cmd --port 8797
 .\InstallAndRun.cmd --stdio
 ```
 
-For unattended first setup, use `InstallAndRun.cmd --root "drawings=C:\Engineering\Drawings" --install-only`; repeat `--root` for multiple roots. Setup creates `AutoCAD MCP Server.lnk` in the project root using the bundled application icon; double-click this shortcut for the icon-bearing launcher. The shortcut contains local paths, is ignored by Git, and is recreated for each checkout. `--stdio` keeps setup messages on stderr for MCP clients and does not prompt, create a shortcut or change Codex integration implicitly. Keep the server window open and press Ctrl+C to stop. Either Codex integration starts its own stdio process and does not need a separate foreground HTTP server.
+For unattended first setup, use `InstallAndRun.cmd --root "drawings=C:\Engineering\Drawings" --install-only` after staging the framework wheel; repeat `--root` for multiple roots. Setup creates `AutoCAD MCP Server.lnk` in the project root using the bundled icon. The shortcut contains local paths, is ignored by Git, and is recreated for each checkout. `--stdio` keeps setup messages on stderr and does not prompt, create a shortcut or change Codex integration implicitly. Keep the server window open and press Ctrl+C to stop. Legacy standalone/broker bindings start their own stdio backend. The experimental framework frontend connects to its already-running app-owned host.
 
 Setup defaults to `--codex-integration auto`. It preserves saved choices and existing app plugins, including disabled plugins. On a fresh integration it installs the standalone plugin unless an enabled Universal Tools plugin has a current accepted AutoCAD registration and workflow assessment. An absent CLI or unreadable plugin inventory defers optional integration while leaving the application usable. Use `--codex-integration none` to skip integration or `--install-plugin` to explicitly install standalone even when Universal Tools is available. See [Codex integration selection](docs/codex-integrations.md).
 
@@ -63,7 +66,7 @@ For manual installation in PowerShell:
 git clone https://github.com/votecoffee/AutoCADMCPServer.git
 cd AutoCADMCPServer
 py -3.13 -m venv .venv
-.venv\Scripts\python.exe -m pip install --require-hashes -r requirements-lock.txt
+.venv\Scripts\python.exe -m pip install --require-hashes --find-links C:\Packages -r requirements-lock.txt
 .venv\Scripts\python.exe -m pip install --no-deps -e .
 .venv\Scripts\python.exe scripts\configure.py --root 'drawings=C:\Engineering\Drawings'
 .venv\Scripts\python.exe -m autocad_mcp status
@@ -119,6 +122,14 @@ Replace IDs with returned values. Omit `--wdp` for ordinary DWG/DXF/PDF roots. U
 
 Python clients use `ElectricalService(service).build("drawings", ...)` from `autocad_mcp.electrical`, then its query, trace, compare and export methods. Keep build options and customer exports under ignored `.local/` or outside the checkout. Snapshot freshness is checked against current input hashes; historical snapshots remain readable for revision comparison.
 
+### Shared app framework
+
+The primary shared-code development path uses the packaged `universal_tools.framework.ApplicationHost` behind AutoCAD's own standalone integration. Its fourteen stable native tools discover and invoke versioned `drawing-engine` backends. All 31 existing operations remain available there, plus a read-only current workflow guide. An authenticated app-owned loopback host and separate stdio frontends need no universal broker or Universal Tools plugin.
+
+Explicit isolated setup uses `framework-prepare`, `framework-serve` and `framework-proxy`. Published app code and nested extraction/render/table/highlight workers remain bound to immutable app snapshots. Original handlers, target/hash checks and app receipts remain authoritative. Backend feature/guide updates can refresh without changing the native front door; native skill/schema changes still require plugin update and Codex reload. Framework calls to one transient backend are serialized and add material startup latency. Actual Codex/native acceptance, recovery/admin UX and optional aggregation of this host remain separate work.
+
+See [shared framework setup, lifecycle and limits](docs/shared-app-framework.md) before a separately authorized pilot. This source checkpoint does not update installed plugins, runtime pointers, native projects or live registrations. The default installer continues preserving the existing legacy route; framework plugin bindings are an explicit option.
+
 ### Standalone Codex plugin
 
 The application continues shipping its independent plugin after broker adoption. Explicitly install or restore it after configuring drawing roots:
@@ -127,11 +138,11 @@ The application continues shipping its independent plugin after broker adoption.
 .\InstallAndRun.cmd --install-only --install-plugin
 ```
 
-This registers `autocad@autocad-local` using the Codex CLI. The installed plugin starts the app's own stdio MCP server with the configured app environment; no broker or separately running HTTP server is required. It includes the application icon and a drawing-analysis skill. Generated runtime bindings, marketplace files and local paths stay under ignored `.local/codex-marketplace/`. The portable template in `plugins/autocad/` has no personal configuration; its default loopback HTTP connection is replaced by a direct stdio binding during local installation.
+This registers `autocad@autocad-local` using the Codex CLI after the verified framework dependency has been staged. Default legacy bindings start the app's own stdio server without a broker or HTTP server. Explicit framework bindings use the app's already-running authenticated host through its own frontend. Both retain the application icon and small drawing-analysis skill; frequently changing framework guidance is read from the backend. Generated bindings and local paths stay under ignored `.local/codex-marketplace/`. The portable template has no personal configuration. See [framework plugin preparation](docs/shared-app-framework.md#publish-and-run-an-isolated-app-host).
 
 Use a new local chat or reload the plugin connection to discover the current tools after installation. The local Codex CLI must be available. `python scripts/install_plugin.py --prepare-only` creates the local package without changing Codex registration. Packaging follows [OpenAI's plugin format](https://developers.openai.com/plugins/build/plugins).
 
-The server admits four active normal requests and 32 queued requests per process by default. Processes sharing app state coordinate a four-worker child-process budget, serialize ODA conversions by default, and serialize AutoCAD UI calls. All state-changing tools accept `request_id` for durable replay and recovery; inspect `cad_get_transaction` after a lost response. Index batches commit per file. See [concurrency and transaction boundaries](docs/concurrency.md).
+The direct server admits four active normal requests and 32 queued requests per process by default. Processes sharing app state coordinate a four-worker child-process budget, serialize ODA conversions by default, and serialize AutoCAD UI calls. Framework and broker routes additionally serialize calls to one backend. All state-changing tools accept `request_id` for durable replay and recovery; inspect `cad_get_transaction` after a lost response. Index batches commit per file. See [concurrency and transaction boundaries](docs/concurrency.md).
 
 ### Connect through Universal Tools
 
@@ -205,7 +216,7 @@ See [VERIFICATION.md](VERIFICATION.md) for synthetic checks, real MCP protocol c
 
 ## Development
 
-Install `requirements-dev-lock.txt` and the editable package, run `python -m pytest -q`, and run `ruff check .` plus `ruff format --check .`. CLI and MCP operations share `DrawingService`; add extraction logic there or in its workers rather than duplicating it in the transport.
+Install the verified framework wheel with the hash-locked `requirements-dev-lock.txt` using a local wheel directory, then install the editable app. Run `python -m pytest -q`, `ruff check .` and `ruff format --check .`. Keep framework development/editable dependencies in an isolated environment; never copy its implementation or use a source submodule. CLI, legacy MCP and framework workers share `DrawingService`; add domain logic there or in its workers rather than duplicating it in a transport.
 
 The source tree keeps the shared service and workers in `src/autocad_mcp/`, reusable command line helpers in `scripts/`, synthetic fixtures and checks in `tests/`, and generic configuration examples in `examples/`. Machine configuration, runtime environments, customer inputs, extracted content and acceptance captures belong outside the tracked tree or under ignored `.local/`.
 

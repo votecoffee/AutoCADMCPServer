@@ -24,6 +24,22 @@ def main():
     serve = sub.add_parser("serve")
     serve.add_argument("--transport", choices=["stdio", "streamable-http"], default="stdio")
     serve.add_argument("--port", type=int, default=8796)
+    serve.add_argument(
+        "--workflow", action="store_true", help="Expose the backend's versioned workflow read tool"
+    )
+    prepare = sub.add_parser(
+        "framework-prepare", help="Publish a private, immutable backend for the app-owned framework host"
+    )
+    prepare.add_argument("--host-state", required=True)
+    prepare.add_argument("--port", type=int, default=8798)
+    prepare.add_argument("--include-highlighting", action="store_true")
+    host = sub.add_parser("framework-serve", help="Run the authenticated app-owned host; no universal daemon")
+    host.add_argument("--host-state", required=True)
+    host.add_argument("--publication")
+    proxy = sub.add_parser(
+        "framework-proxy", help="Connect the standalone app frontend to its already-running host"
+    )
+    proxy.add_argument("--host-state", required=True)
     sub.add_parser("status")
     inventory = sub.add_parser("inventory")
     inventory.add_argument("root_id")
@@ -62,14 +78,38 @@ def main():
     compare.add_argument("before_project_id")
     compare.add_argument("after_project_id")
     args = parser.parse_args()
+    if args.command.startswith("framework-"):
+        from pathlib import Path
+
+        from . import framework_host
+
+        state = Path(args.host_state)
+        if args.command == "framework-prepare":
+            result = framework_host.prepare(
+                Path(args.config), state, port=args.port, highlighting=args.include_highlighting
+            )
+            print(json.dumps(result))
+        elif args.command == "framework-serve":
+            framework_host.serve(
+                state,
+                Path(args.publication) if args.publication else state / "autocad-application.json",
+                Path(args.config),
+            )
+        else:
+            framework_host.proxy(state)
+        return
     from .config import Config
     from .service import DrawingService
 
     service = DrawingService(Config.load(args.config))
     if args.command == "serve":
-        from .server import create_server
+        from .server import SDK2, create_server
 
-        create_server(service, args.port).run(transport=args.transport)
+        server = create_server(service, args.port, workflow=args.workflow)
+        if args.transport == "stdio" or not SDK2:
+            server.run(transport=args.transport)
+        else:
+            server.run(transport="streamable-http", host="127.0.0.1", port=args.port)
         return
     if args.command.startswith("electrical-"):
         from pathlib import Path

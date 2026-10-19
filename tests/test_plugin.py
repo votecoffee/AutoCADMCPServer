@@ -43,3 +43,11 @@ def test_plugin_binding_is_local_independent_and_relocatable(tmp_path):
     assert alternate_package != package
     alternate_binding = json.loads((alternate_package / "mcp.json").read_text())
     assert str(alternate) in alternate_binding["mcpServers"]["autocad"]["args"]
+    from autocad_mcp.framework_host import prepare as publish
+
+    state = repo / ".local/framework-host"
+    publish(config, state)
+    framework_package = Path(prepare(repo, config, frontend="framework", host_state=state)["package"])
+    binding = json.loads((framework_package / "mcp.json").read_bytes())["mcpServers"]["autocad"]
+    assert "framework-proxy" in binding["args"] and str(state) in binding["args"]
+    assert "universal_tools" not in binding["args"]

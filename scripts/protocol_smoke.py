@@ -4,11 +4,10 @@ import argparse
 import asyncio
 import json
 import sys
-from datetime import timedelta
 from pathlib import Path
 
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from mcp import ClientSession
+from mcp.client.stdio import StdioServerParameters, stdio_client
 
 
 async def run(config, root, project_id=None):
@@ -16,17 +15,17 @@ async def run(config, root, project_id=None):
         command=sys.executable, args=["-m", "autocad_mcp", "--config", str(Path(config).resolve()), "serve"]
     )
     async with stdio_client(parameters) as (read, write):
-        async with ClientSession(read, write, read_timeout_seconds=timedelta(seconds=180)) as session:
+        async with ClientSession(read, write, read_timeout_seconds=180.0) as session:
             initialized = await session.initialize()
             tools = (await session.list_tools()).tools
             assert len(tools) == 31
             status = await session.call_tool("cad_status", {})
-            assert not status.isError
+            assert not status.is_error
             inventory = await session.call_tool("cad_list_files", {"root_id": root, "limit": 1})
-            assert not inventory.isError
-            first = inventory.structuredContent["items"][0]["relative_path"]
+            assert not inventory.is_error
+            first = inventory.structured_content["items"][0]["relative_path"]
             inspect = await session.call_tool("cad_inspect", {"root_id": root, "relative_path": first})
-            assert not inspect.isError
+            assert not inspect.is_error
             electrical_calls = []
             if project_id:
                 for name in (
@@ -43,16 +42,16 @@ async def run(config, root, project_id=None):
                     if name not in {"cad_get_electrical_project", "cad_export_electrical_project"}:
                         arguments["limit"] = 2
                     result = await session.call_tool(name, arguments)
-                    assert not result.isError, result.content
-                    assert result.structuredContent is not None
+                    assert not result.is_error, result.content
+                    assert result.structured_content is not None
                     electrical_calls.append(name)
             print(
                 json.dumps(
                     {
-                        "server": initialized.serverInfo.name,
+                        "server": initialized.server_info.name,
                         "tool_count": len(tools),
-                        "read_tools": sum(t.annotations.readOnlyHint for t in tools),
-                        "source_sha256": inspect.structuredContent["source"]["sha256"],
+                        "read_tools": sum(t.annotations.read_only_hint for t in tools),
+                        "source_sha256": inspect.structured_content["source"]["sha256"],
                         "electrical_calls": electrical_calls,
                         "passed": True,
                     }

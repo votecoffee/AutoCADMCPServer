@@ -20,7 +20,7 @@ FILES = (
 )
 
 
-def prepare(repo: Path, config: Path | None = None):
+def prepare(repo: Path, config: Path | None = None, *, frontend="legacy", host_state: Path | None = None):
     repo = repo.resolve()
     template = repo / "plugins" / "autocad"
     config = (config or repo / ".local" / "config.json").resolve(strict=True)
@@ -36,6 +36,27 @@ def prepare(repo: Path, config: Path | None = None):
         "args": ["-m", "autocad_mcp", "--config", str(config), "serve"],
         "cwd": str(repo),
     }
+    if frontend == "framework":
+        if host_state is None or not (host_state / "autocad-application.json").is_file():
+            raise ValueError("Prepare a dedicated app framework host before preparing its frontend")
+        from autocad_mcp.framework_entry import verify_deployment
+
+        publication = json.loads((host_state / "autocad-application.json").read_bytes())
+        arguments = publication["backends"][0]["service"]["transport"]["args"]
+        deployment = verify_deployment(Path(arguments[-2]).parent, arguments[-1])
+        if publication["id"] != "autocad" or Path(deployment["config"]).resolve() != config:
+            raise ValueError("Framework frontend must use this app and selected configuration")
+        server["args"] = [
+            "-m",
+            "autocad_mcp",
+            "--config",
+            str(config),
+            "framework-proxy",
+            "--host-state",
+            str(host_state.resolve()),
+        ]
+    elif frontend != "legacy" or host_state is not None:
+        raise ValueError("Select legacy or framework explicitly; host state applies only to framework")
     portable = {
         "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
         "mcpServers": {"autocad": server},
@@ -79,6 +100,7 @@ def prepare(repo: Path, config: Path | None = None):
         "plugin": "autocad@autocad-local",
         "transport": "stdio",
         "broker_required": False,
+        "frontend": frontend,
     }
 
 
@@ -94,6 +116,8 @@ def main():
         help="Auto preserves existing choices and prefers only an accepted broker route",
     )
     parser.add_argument("--config", type=Path, help="Use this app configuration in the generated binding")
+    parser.add_argument("--frontend", choices=["legacy", "framework"], default="legacy")
+    parser.add_argument("--host-state", type=Path, help="Dedicated app-owned framework host state")
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
     config = (args.config or repo / ".local/config.json").resolve(strict=True)
@@ -101,12 +125,12 @@ def main():
     from autocad_mcp.integration import integration_plan
 
     if args.prepare_only:
-        print(json.dumps(prepare(repo, config)))
+        print(json.dumps(prepare(repo, config, frontend=args.frontend, host_state=args.host_state)))
         return
     plan = integration_plan(repo, config, args.mode)
     result = dict(plan)
     if plan["action"] == "install":
-        result.update(prepare(repo, config))
+        result.update(prepare(repo, config, frontend=args.frontend, host_state=args.host_state))
         codex = shutil.which("codex")
         if not codex:
             raise ValueError("Codex CLI was not found; local plugin prepared but not registered")

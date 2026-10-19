@@ -1,6 +1,17 @@
 """App-owned workflow guidance available with either MCP integration route."""
 
 WORKFLOW = """AutoCAD drawing-analysis workflow v1.
+The app-owned shared-framework host has fourteen stable discovery/invocation tools.
+There, search drawing-engine, describe its cad_get_workflow tool and read this current
+versioned guide before dispatch. Describe each backend tool for its schema and catalog
+revision. This standalone route requires no Universal Tools plugin. Legacy direct cad_*
+tools remain available through the compatibility endpoint. Optional universal aggregation
+is a separate assessed route; using the shared library does not certify that integration.
+Framework backend changes require explicit app-owned publication and refresh. Native skill,
+front-door schema, framework runtime or startup-instruction changes require plugin/host update
+and Codex reconnection. Chat approval-mode settings are not an app authorization mechanism;
+no chat-policy adapter or model-supplied approval-mode override is provided.
+
 Use one selected route for an entire workflow. The standalone plugin connects directly to
 this app's MCP server. Through Universal Tools, search for service autocad, describe_service
 for these instructions, then describe_tool for each current schema and catalog_revision.

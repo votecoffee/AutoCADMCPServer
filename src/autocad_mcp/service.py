@@ -8,7 +8,6 @@ import os
 import shutil
 import sqlite3
 import subprocess
-import sys
 import tempfile
 import time
 import uuid
@@ -20,6 +19,7 @@ import pymupdf
 from . import EXTRACTION_VERSION, __version__
 from .config import SUPPORTED, Config
 from .coordination import Coordinator
+from .worker_launch import worker_command
 
 
 def sha256(path: Path) -> str:
@@ -207,15 +207,12 @@ class DrawingService:
                 "max_entities": self.config.max_entities,
                 "max_pages": self.config.max_pages,
             }
-            args = [
-                sys.executable,
-                "-m",
-                "autocad_mcp",
+            args = worker_command(
                 "_extract",
                 str(source),
                 str(destination),
                 json.dumps(options),
-            ]
+            )
             opts = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
             try:
                 # A Windows venv launcher can stall when it inherits the active MCP input pipe.
@@ -463,10 +460,7 @@ class DrawingService:
             shutil.copyfile(source, staged)
             if sha256(staged) != source_doc["source"]["sha256"]:
                 raise ValueError("Source changed before rendering")
-            args = [
-                sys.executable,
-                "-m",
-                "autocad_mcp",
+            args = worker_command(
                 "_render",
                 str(staged),
                 str(target),
@@ -480,7 +474,7 @@ class DrawingService:
                         else None,
                     }
                 ),
-            ]
+            )
             opts = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
             with self.coordinator.worker(native=source.suffix.lower() in {".dwg", ".dwt", ".dws"}):
                 result = subprocess.run(
@@ -520,15 +514,12 @@ class DrawingService:
             opts = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
             with self.coordinator.worker():
                 result = subprocess.run(
-                    [
-                        sys.executable,
-                        "-m",
-                        "autocad_mcp",
+                    worker_command(
                         "_tables",
                         str(staged),
                         str(destination),
                         json.dumps({"page": page}),
-                    ],
+                    ),
                     check=False,
                     stdin=subprocess.DEVNULL,
                     capture_output=True,

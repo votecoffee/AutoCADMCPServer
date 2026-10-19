@@ -6,11 +6,11 @@ import json
 import os
 import re
 import subprocess
-import sys
 import uuid
 from pathlib import Path
 
 from .service import sha256
+from .worker_launch import worker_command
 
 
 def highlight_document(application, filename: str, handle: str, enabled: bool, expected_type: str):
@@ -117,7 +117,7 @@ def highlight(service, source: dict, enabled=True):
     with service.coordinator.lock("ui:autocad"), service.coordinator.worker():
         try:
             subprocess.run(
-                [sys.executable, "-m", "autocad_mcp", "_highlight", str(request), str(response)],
+                worker_command("_highlight", str(request), str(response)),
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,

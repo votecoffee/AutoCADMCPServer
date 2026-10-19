@@ -141,8 +141,8 @@ async def test_mcp_classification_and_result_budget(drawing_service):
     by_name = {tool.name: tool for tool in tools}
     assert len(tools) == 31
     for name, tool in by_name.items():
-        assert tool.outputSchema is not None
-        assert tool.annotations.readOnlyHint == (
+        assert tool.output_schema is not None
+        assert tool.annotations.read_only_hint == (
             name
             not in {
                 "cad_index_project",
@@ -152,6 +152,6 @@ async def test_mcp_classification_and_result_budget(drawing_service):
                 "cad_highlight_source_object",
             }
         )
-        assert tool.annotations.openWorldHint is False
+        assert tool.annotations.open_world_hint is False
     result = await server.call_tool("cad_status", {})
     assert result

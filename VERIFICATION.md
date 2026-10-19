@@ -3,7 +3,7 @@
 Run from the checkout with its Python environment. No customer or native CAD files are needed for the synthetic suite.
 
 ```powershell
-.venv\Scripts\python.exe -m pip install --require-hashes -r requirements-dev-lock.txt
+.venv\Scripts\python.exe -m pip install --require-hashes --find-links C:\Packages -r requirements-dev-lock.txt
 .venv\Scripts\python.exe -m pip install --no-deps -e .
 .venv\Scripts\python.exe -m pytest -q
 .venv\Scripts\ruff.exe check .
@@ -36,3 +36,7 @@ For private electrical acceptance, build snapshots for each selected scope, expo
 Concurrency and operation receipt checks are documented in [docs/concurrency.md](docs/concurrency.md). Test the standalone plugin by preparing a local package, installing it with the Codex CLI, checking that it is enabled, and launching the installed cache MCP binding through real independent clients. Verify that the public source package excludes generated runtime bindings and private state.
 
 Installer policy fixtures cover absent/disabled/unreadable plugins, explicit standalone selection, missing or stale broker prerequisites, saved route preservation and separate native-highlighting acceptance. Follow [Codex integration assessment](docs/codex-integrations.md) for the optional real broker fixture. Run `scripts/broker_smoke.py --broker-python ABSOLUTE_TEST_PYTHON` with the selected installed broker package; it uses disposable drawings and its own state, not the normal broker or active native projects. Preserve the standalone integration until host and selected native acceptance are complete.
+
+The framework wheel is a required exact normal dependency. Verify it with `python scripts/framework_dependency.py WHEEL_PATH`, then use its private/local wheel directory with the runtime or development lock. There is no public package feed. Keep tests and package validation in a separate environment; do not update the live app environment, installed plugins or broker pointers as part of source alignment.
+
+Run `python -m pytest tests/test_framework.py tests/test_framework_dependency.py tests/test_plugin.py -q -o junit_family=xunit1 --junitxml=PRIVATE_REPORT.xml` for focused framework checks, then the complete suite. Framework tests use actual drawing handlers, disposable sources, a private authenticated host and separate native clients/frontends. They verify fixed front-door schemas across backend/guide/parser updates, nested worker binding, result/schema parity, receipts, source preservation and deployment/config tampering. Latency samples are recorded as JUnit properties; keep reports private and state the selected transient lifecycle. See [framework acceptance limits](docs/shared-app-framework.md#validation-and-remaining-gaps). Native/Codex UI activation and optional nested universal aggregation are not established by protocol fixtures.

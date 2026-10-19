@@ -11,13 +11,12 @@ import sys
 import tempfile
 import time
 from contextlib import AsyncExitStack
-from datetime import timedelta
 from pathlib import Path
 
 import ezdxf
 import httpx
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from mcp import ClientSession
+from mcp.client.stdio import StdioServerParameters, stdio_client
 
 from autocad_mcp.electrical import atomic_json
 from autocad_mcp.guidance import WORKFLOW
@@ -25,9 +24,9 @@ from autocad_mcp.integration import OFFLINE_WRITES, broker_manifest, broker_meta
 
 
 def data(result):
-    if result.isError:
+    if result.is_error:
         raise AssertionError(result.content)
-    return result.structuredContent or json.loads(result.content[0].text)
+    return result.structured_content or json.loads(result.content[0].text)
 
 
 async def exercise(repo, config, broker_python, state):
@@ -35,9 +34,7 @@ async def exercise(repo, config, broker_python, state):
 
         async def client(parameters):
             read, write = await stack.enter_async_context(stdio_client(parameters))
-            session = await stack.enter_async_context(
-                ClientSession(read, write, read_timeout_seconds=timedelta(seconds=90))
-            )
+            session = await stack.enter_async_context(ClientSession(read, write, read_timeout_seconds=90.0))
             initialized = await session.initialize()
             return session, initialized
 
@@ -61,11 +58,11 @@ async def exercise(repo, config, broker_python, state):
         described = {}
         for tool in definitions:
             description = data(await broker.call_tool("describe_tool", {"tool_id": "autocad/" + tool.name}))
-            assert description["definition"] == tool.model_dump(mode="json", exclude_none=True)
+            assert description["definition"] == tool.model_dump(mode="json", by_alias=True, exclude_none=True)
             assert description["classification"] == (
-                "read" if tool.annotations.readOnlyHint else "write_or_unknown"
+                "read" if tool.annotations.read_only_hint else "write_or_unknown"
             )
-            assert description["callable"] == (tool.annotations.readOnlyHint or tool.name in OFFLINE_WRITES)
+            assert description["callable"] == (tool.annotations.read_only_hint or tool.name in OFFLINE_WRITES)
             described[tool.name] = description
 
         async def routed(name, arguments, outer_id=None, frontend=broker):
@@ -126,12 +123,12 @@ async def exercise(repo, config, broker_python, state):
             },
             "broker-export-0001",
         )
-        assert duplicate.isError  # Broker journal does not replay writes.
+        assert duplicate.is_error  # Broker journal does not replay writes.
         outer = data(await broker.call_tool("get_request_status", {"request_id": "broker-export-0001"}))
         assert outer["status"] == "completed"
         wrong = {"root_id": "fixture", "relative_path": "missing.dxf"}
         errors = await asyncio.gather(direct.call_tool("cad_inspect", wrong), routed("cad_inspect", wrong))
-        assert all(r.isError for r in errors)
+        assert all(r.is_error for r in errors)
         assert errors[0].content == errors[1].content
         denied = await routed(
             "cad_highlight_source_object",
@@ -142,7 +139,7 @@ async def exercise(repo, config, broker_python, state):
             },
             "broker-denied-0001",
         )
-        assert denied.isError
+        assert denied.is_error
         assert (
             data(await direct.call_tool("cad_get_transaction", {"request_id": "app-denied-0001"}))["state"]
             == "not_found"

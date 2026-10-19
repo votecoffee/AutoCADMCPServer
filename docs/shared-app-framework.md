@@ -1,0 +1,66 @@
+# Shared app framework integration
+
+Version 0.4 adds an experimental app-owned host using the tested local `universal-codex-tools==0.14.0` development package and `universal_tools.framework.ApplicationHost`. Both app and host target **MCP Python SDK 2.3.0**. This is the primary shared-code development path. AutoCAD keeps its independent application, CLI, native compatibility endpoint and standalone Codex plugin. Universal Tools is optional and is not required as a second plugin.
+
+```mermaid
+flowchart LR
+    P[AutoCAD standalone plugin] --> F[App-owned stdio frontend]
+    F --> H[Authenticated app host: 14 fixed tools]
+    H --> B[Versioned drawing backend: MCP workers]
+    B --> S[Shared DrawingService and ElectricalService]
+    S --> D[Preserved drawing snapshots]
+```
+
+The front door uses the framework's existing search, description, invocation, receipt and session schemas. Its historical `broker_status` tool describes this app host. Backend `drawing-engine` exposes all 31 existing operations plus read-only `cad_get_workflow`. Existing handler schemas, structured results, source checks and durable app receipts remain authoritative. The legacy `serve` command retains its original 31 native definitions.
+
+## Dependency and packaging
+
+Use the exact tested normal package dependency; do not vendor framework source, add a Git submodule or depend on a moving checkout. MCP is pinned at 2.3.0. Setup requires the framework wheel to declare that SDK version and rejects older pins; it never installs an older SDK to accommodate the framework. Windows pywin32 is an explicit app dependency for the existing guarded COM feature. Transitive runtime/development requirements remain hash locked. Coordinated development may explicitly install the framework checkout as an editable dependency in an isolated development environment, but acceptance uses a frozen wheel so concurrent edits cannot alter the test input. Distributed app metadata names the exact package version.
+
+There is no public framework package feed at this checkpoint. Obtain the tested 0.14.0 development wheel separately. Its SHA-256 is `3063dac969222d54d5babf316c1da61c46cb9443a0a7f202694bbe5b1acaea1d`. This pins an app-tested SDK 2.3 snapshot, not upstream release approval. A later framework artifact needs its own hash update and compatibility assessment. Setup verifies wheel identity, hash, RECORD inventory, SDK requirement and license before caching it under ignored `.local/wheels/` for ordinary dependency installation:
+
+```powershell
+python scripts/framework_dependency.py 'C:\Packages\universal_codex_tools-0.14.0-py3-none-any.whl'
+.\InstallAndRun.cmd --framework-wheel 'C:\Packages\universal_codex_tools-0.14.0-py3-none-any.whl' --install-only
+```
+
+Manual installation uses `pip install --require-hashes --find-links C:\Packages -r requirements-lock.txt`, then `pip install --no-deps -e .`. Development uses the development lock similarly. A source ZIP does not redistribute the framework wheel or local bindings. Record artifact hashes and dependency versions in private acceptance evidence. An incompatible future SDK/native dependency set requires a separately managed out-of-process host; do not downgrade the app to force a shared environment. No native .NET/NuGet framework binding is assumed.
+
+A limited direct-server import/constructor bridge keeps existing editable 0.3 installations on their already-installed SDK 1.30 usable until an explicitly authorized upgrade. It does not install or select SDK 1.x for new deployments. The new app package and shared host require SDK 2.3.0; the framework host has no older-SDK fallback.
+
+## Publish and run an isolated app host
+
+Use disposable drawings and a separate configuration during assessment. The following commands are explicit local administrative operations, not model tools:
+
+```powershell
+python -m autocad_mcp --config .local/test-config.json framework-prepare --host-state .local/test-framework --port 8798
+python -m autocad_mcp --config .local/test-config.json framework-serve --host-state .local/test-framework
+```
+
+The host state must be separate from source roots, app business state and normal universal broker registrations. `framework-prepare` initializes private bearer-protected loopback settings, snapshots app code into immutable content-addressed deployments and atomically publishes the selected backend. It does not start a native application, install a plugin, change live registrations or migrate a workflow. Highlighting is excluded from the default write allowlist; `--include-highlighting` is an explicit additional policy choice requiring separate native acceptance.
+
+In another process, `python -m autocad_mcp framework-proxy --host-state .local/test-framework` runs the app-owned stdio frontend against that already-running host. It does not start a universal daemon. Each frontend retains independent framework affinity; targets and results remain intentionally shared app state rather than private per-chat documents.
+
+To prepare the standalone plugin for an authorized future framework pilot:
+
+```powershell
+python scripts/install_plugin.py --prepare-only --config .local/test-config.json --frontend framework --host-state .local/test-framework
+```
+
+This only generates private bindings. Explicit later standalone installation uses the same options without `--prepare-only`. Do not run it as part of source compatibility work. Existing install choices are preserved; default installer bindings remain on the legacy endpoint until an explicitly authorized pilot selects the framework frontend. Optional universal registration also continues targeting the legacy endpoint; nested aggregation of the framework host is not certified.
+
+## Publication and recovery boundaries
+
+Changing backend code or live workflow metadata requires a new content-addressed deployment. After quiescence and receipt reconciliation, repeat `framework-prepare` and call `refresh_services` on the same connected app frontend. Re-describe changed tool revisions. Backend additions and workflow read content can then change without modifying the fourteen native front-door schemas. Native skill/schema changes still require plugin installation and Codex reload. Runtime, identity and startup-instruction changes require host restart/reconnection.
+
+The publication pins its entrypoint and deployment manifest. Every backend and nested extraction/render/table/highlight worker verifies all snapshotted app files, the selected config bytes, Python version and key dependency versions before importing handlers. Nested workers stay on that publication rather than resolving a newer editable app. App source edits cannot silently alter an already-published backend. This does not authenticate artifacts or hash the entire installed native/transitive dependency closure; retain normal package/install controls and native acceptance.
+
+Use one selected route throughout an operation. Host and app write IDs/receipts are separate. The host's completed receipt means the MCP call returned; the app result may still report an uncertain native effect. App-owned publication and refresh therefore also check the inner app journal. Any non-successful app receipt blocks refresh/publication; generic framework uncertain/app-error and ownership barriers remain in force too. No automatic acknowledgment, retry, route failover or model-facing recovery override is supplied. App reconciliation/admin controls for resolving historical non-successful receipts remain future work; preserve direct read/audit access and involve the local operator. Restarting cannot establish rollback or completed native work.
+
+## Validation and remaining gaps
+
+`tests/test_framework.py` uses real AutoCAD handlers with synthetic DXF/PDF inputs and private state. It compares legacy tool schemas/results, preserves original bytes, exercises app-state writes and separate receipts, rejects altered deployment/configuration bytes, and checks unknown inner outcomes. Two unchanged native MCP sessions discover a new disposable backend operation and revised workflow after refresh while their fourteen front-door definitions remain identical. A deliberately changed parser also executes through the snapshot's nested worker. A separate stdio app frontend runs without a universal daemon/plugin installation.
+
+The selected backend is transient and stateless: targets are explicit, snapshots/receipts are durable and no private native document session is retained. Framework calls to one backend remain serialized. Disposable warm-inspect benchmarks record direct service versus transient-host latency; process initialization adds material overhead, commonly seconds for small cached reads. These measurements do not establish native/host performance acceptance. A future retained/shared profile needs app-owned quiescence and retirement controls before it can improve that lifecycle safely.
+
+Actual Codex activation, multi-chat selection/lifetimes, UI/media display, live AutoCAD highlighting, native acceptance, recovery/admin UX, complete deployment dependency closure and optional nested universal aggregation remain unassessed. The current app has no form-approval workflow to migrate and no adapter for Codex chat approval settings. Model arguments cannot override app policy. This checkpoint is source/package and isolated protocol alignment, not permission or evidence to migrate an installed workflow.

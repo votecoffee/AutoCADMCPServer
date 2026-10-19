@@ -5,23 +5,32 @@ import json
 from functools import wraps
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
+try:
+    from mcp.server import MCPServer
+
+    SDK2 = True
+except ImportError:
+    # Keep existing editable 0.3 installations usable until their explicit runtime upgrade.
+    from mcp.server.fastmcp import FastMCP as MCPServer
+
+    SDK2 = False
+
+from . import __version__
 from .coordination import RequestScheduler
 from .guidance import WORKFLOW
 from .service import DrawingService
 from .transactions import Transactions
 
 
-def create_server(service: DrawingService, port: int = 8796) -> FastMCP:
+def create_server(service: DrawingService, port: int = 8796, *, workflow: bool = False) -> MCPServer:
     scheduler = RequestScheduler(service.config.max_concurrent_requests, service.config.max_queued_requests)
     transactions = Transactions(service.config.state, service.coordinator)
-    mcp = FastMCP(
+    mcp = MCPServer(
         "AutoCAD MCP Server",
-        host="127.0.0.1",
-        port=port,
         instructions=WORKFLOW,
+        **({"version": __version__} if SDK2 else {"host": "127.0.0.1", "port": port}),
     )
 
     def tool(*, read=True, control=False):
@@ -65,12 +74,33 @@ def create_server(service: DrawingService, port: int = 8796) -> FastMCP:
 
             return mcp.tool(
                 structured_output=True,
-                annotations=ToolAnnotations(
-                    readOnlyHint=read, destructiveHint=False, idempotentHint=read, openWorldHint=False
+                annotations=ToolAnnotations.model_validate(
+                    {
+                        "readOnlyHint": read,
+                        "destructiveHint": False,
+                        "idempotentHint": read,
+                        "openWorldHint": False,
+                    }
                 ),
             )(wrapped)
 
         return decorate
+
+    if workflow:
+
+        @tool(control=True)
+        def cad_get_workflow() -> dict:
+            """Read current app-owned drawing workflow, source boundaries and request recovery guidance."""
+            import hashlib
+
+            from . import __version__
+
+            return {
+                "schema_version": 1,
+                "app_version": __version__,
+                "workflow_revision": hashlib.sha256(WORKFLOW.encode()).hexdigest(),
+                "text": WORKFLOW,
+            }
 
     @tool(control=True)
     def cad_status() -> dict:

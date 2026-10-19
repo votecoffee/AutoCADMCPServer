@@ -24,6 +24,9 @@ def main():
     )
     parser.add_argument("--stdio", action="store_true", help="Use MCP stdio instead of loopback HTTP")
     parser.add_argument(
+        "--framework-wheel", help="Verified local SDK 2.3 shared framework wheel; cached privately"
+    )
+    parser.add_argument(
         "--install-plugin", action="store_true", help="Explicitly install the standalone Codex plugin"
     )
     parser.add_argument(
@@ -43,6 +46,9 @@ def main():
         parser.error("Python 3.11 or newer is required")
     if not 1 <= args.port <= 65535:
         parser.error("--port must be 1..65535")
+    from framework_dependency import stage
+
+    wheel_directory = stage(REPO, args.framework_wheel)
     environment = REPO / ".venv"
     python = environment / "Scripts" / "python.exe"
     uv = shutil.which("uv")
@@ -61,6 +67,8 @@ def main():
                 "--python",
                 str(python),
                 "--require-hashes",
+                "--find-links",
+                str(wheel_directory),
                 "-r",
                 str(REPO / "requirements-lock.txt"),
             ]
@@ -79,6 +87,8 @@ def main():
                 "pip",
                 "install",
                 "--require-hashes",
+                "--find-links",
+                str(wheel_directory),
                 "-r",
                 str(REPO / "requirements-lock.txt"),
             ]
@@ -155,3 +165,6 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Server stopped.", file=sys.stderr)
         raise SystemExit(130)
+    except (ValueError, OSError) as error:
+        print(f"Setup failed: {error}", file=sys.stderr)
+        raise SystemExit(1)
