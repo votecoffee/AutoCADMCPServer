@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling>=1.26,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "autocad-mcp-server"
+version = "0.1.0"
+description = "Source-preserving local DWG, DXF and PDF information extraction for MCP"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+dependencies = ["mcp>=1.20,<2", "ezdxf>=1.4,<2", "pymupdf>=1.26,<2", "pillow>=11,<13"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "ruff>=0.14,<1"]
+
+[project.urls]
+Repository = "https://github.com/votecoffee/AutoCADMCPServer"
+Issues = "https://github.com/votecoffee/AutoCADMCPServer/issues"
+
+[project.scripts]
+autocad-mcp = "autocad_mcp.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/autocad_mcp"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 110
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

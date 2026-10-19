@@ -1,0 +1,5 @@
+{
+  "roots": {"drawings": "C:\\Engineering\\Drawings"},
+  "state_dir": "C:\\Engineering\\AutoCADMCPState",
+  "oda_executable": "C:\\Program Files\\ODA\\ODAFileConverter 25.12.0\\ODAFileConverter.exe"
+}
