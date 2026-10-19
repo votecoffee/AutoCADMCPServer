@@ -19,7 +19,7 @@ async def run(config, root):
         async with ClientSession(read, write, read_timeout_seconds=timedelta(seconds=180)) as session:
             initialized = await session.initialize()
             tools = (await session.list_tools()).tools
-            assert len(tools) == 17
+            assert len(tools) == 29
             status = await session.call_tool("cad_status", {})
             assert not status.isError
             inventory = await session.call_tool("cad_list_files", {"root_id": root, "limit": 1})

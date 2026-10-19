@@ -13,7 +13,18 @@ from ezdxf.math import Matrix44
 
 SCHEMA_VERSION = 1
 ALIASES = {
-    "tag": ["P_TAG1", "TAGSTRIP", "TAG1", "TAG1F", "TAG2", "TAG2F", "TAG", "DEVICE_TAG", "COMPONENT_TAG"],
+    "tag": [
+        "P_TAG1",
+        "P_TAGSTRIP",
+        "TAGSTRIP",
+        "TAG1",
+        "TAG1F",
+        "TAG2",
+        "TAG2F",
+        "TAG",
+        "DEVICE_TAG",
+        "COMPONENT_TAG",
+    ],
     "description": ["DESC1", "DESC2", "DESC3", "DESCRIPTION", "DESC"],
     "manufacturer": ["MFG", "MANUFACTURER", "VENDOR"],
     "catalog": ["CAT", "CATALOG", "CATALOG_NUMBER", "CATALOG_NO", "PART_NUMBER"],
@@ -228,6 +239,21 @@ def normalize_instance(row: dict, drawing: dict, mapping: dict) -> dict | None:
     for key in mapping:
         fields[key], names = pick(attrs, mapping, key)
         if names:
+            if key == "tag":
+                observed_names = {a["tag"].upper() for a in row.get("attributes", [])}
+                names = [
+                    part
+                    for n in names
+                    for part in (
+                        [n]
+                        if n in observed_names
+                        else [
+                            n + suffix
+                            for suffix in ("_PART1", "_PARTX", "_PART2")
+                            if n + suffix in observed_names
+                        ]
+                    )
+                ]
             field_sources[key] = {"kind": "attribute", "names": names, "interpreted": False}
     is_plc = any(re.fullmatch(r"TAGA\d+", key) for key in attrs)
     if not (fields["tag"] or fields["manufacturer"] or fields["catalog"] or is_plc):
@@ -237,6 +263,8 @@ def normalize_instance(row: dict, drawing: dict, mapping: dict) -> dict | None:
         if is_plc
         else "panel"
         if attrs.get("P_TAG1")
+        else "panel_terminal"
+        if attrs.get("P_TAGSTRIP")
         else "terminal"
         if attrs.get("TAGSTRIP")
         else "child"
@@ -254,7 +282,11 @@ def normalize_instance(row: dict, drawing: dict, mapping: dict) -> dict | None:
             (name for name, pattern in TYPE_RULES if re.search(pattern, description, re.I)), None
         )
         device_type = device_type or (
-            "io_module" if is_plc else "terminal" if role == "terminal" else "unclassified"
+            "io_module"
+            if is_plc
+            else "terminal"
+            if role in {"terminal", "panel_terminal"}
+            else "unclassified"
         )
         field_sources["device_type"] = {
             "kind": "classification_rule",
@@ -288,6 +320,16 @@ def normalize_instance(row: dict, drawing: dict, mapping: dict) -> dict | None:
         "attributes": attrs,
         "attribute_conflicts": conflicts,
         "terminals": terminals,
+        "additional_catalogs": [
+            {
+                "suffix": key[3:],
+                "manufacturer": attrs.get("MFG" + key[3:]),
+                "catalog": value,
+                "assembly_code": attrs.get("ASSYCODE" + key[3:]),
+            }
+            for key, value in attrs.items()
+            if re.fullmatch(r"CAT\d+", key) and value
+        ],
         "connection_points": connections,
         "sources": [source],
         "field_sources": field_sources,

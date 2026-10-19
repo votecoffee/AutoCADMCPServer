@@ -127,8 +127,16 @@ class DrawingService:
                 "DWT/DWS use the DWG conversion route; validate each input individually.",
                 "DGN/DWF/DWFx, STEP/IGES, SolidWorks and eDrawings: inventory only.",
                 "DWG structure is extracted via ODA/DXF; native CAD tables and custom proxies may be incomplete.",
-                "No CAD editing, native application control, network reference loading or automatic OCR.",
+                "No CAD editing, network reference loading or automatic OCR; optional guarded AutoCAD UI highlighting only.",
             ],
+            "electrical_inputs": [
+                "WDP project membership",
+                "Electrical CSV/TSV/JSON reports",
+                "DWG/DXF block attributes",
+                "PDF text candidates",
+            ],
+            "electrical_analysis_requires_current_index": True,
+            "highlighting": "Windows ActiveX: already-running AutoCAD, unchanged open drawing, top-level source object only",
         }
 
     def inventory(self, root_id: str, supported_only=True, offset=0, limit=100) -> dict:
@@ -137,7 +145,7 @@ class DrawingService:
             rows = [row for row in rows if row["supported"]]
         return paginate(rows, offset, limit)
 
-    def load(self, root_id: str, relative_path: str) -> dict:
+    def load(self, root_id: str, relative_path: str, *, cached_only: bool = False) -> dict:
         path = self.config.resolve(root_id, relative_path)
         extension = path.suffix.lower()
         if extension not in SUPPORTED:
@@ -148,6 +156,10 @@ class DrawingService:
         if cached.exists():
             data = json.loads(cached.read_text(encoding="utf-8"))
         else:
+            if cached_only:
+                raise ValueError(
+                    "Current extraction cache is missing; run cad_index_project before electrical analysis"
+                )
             with tempfile.TemporaryDirectory(dir=self.config.state / "scratch") as folder:
                 scratch = Path(folder)
                 source = scratch / ("source" + extension)

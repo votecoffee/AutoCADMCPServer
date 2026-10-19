@@ -49,7 +49,10 @@ class Config:
         relative = Path(relative_path)
         if relative.is_absolute() or relative.drive or ":" in relative_path:
             raise ValueError("Supply a path relative to the named root")
-        result = (self.roots[root_id] / relative).resolve(strict=True)
+        candidate = Path(os.path.abspath(self.roots[root_id] / relative))
+        if not inside(candidate, self.roots[root_id]):
+            raise ValueError("Source is outside the named root")
+        result = candidate.resolve(strict=True)
         if not inside(result, self.roots[root_id]) or not result.is_file():
             raise ValueError("Source is outside the named root or is not a file")
         if result.stat().st_size > self.max_file_bytes:

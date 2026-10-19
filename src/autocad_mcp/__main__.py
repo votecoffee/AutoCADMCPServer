@@ -7,13 +7,15 @@ import sys
 
 
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] in {"_extract", "_render", "_tables"}:
+    if len(sys.argv) > 1 and sys.argv[1] in {"_extract", "_render", "_tables", "_highlight"}:
         if sys.argv[1] == "_extract":
             from .extract import run_worker
         elif sys.argv[1] == "_render":
             from .render import run_worker
-        else:
+        elif sys.argv[1] == "_tables":
             from .render import run_tables as run_worker
+        else:
+            from .autocad import run_worker
         run_worker(*sys.argv[2:])
         return
     parser = argparse.ArgumentParser(description="AutoCAD MCP Server - local DWG/DXF/PDF extraction")
@@ -39,6 +41,26 @@ def main():
     search = sub.add_parser("search")
     search.add_argument("root_id")
     search.add_argument("query")
+    build = sub.add_parser("electrical-build")
+    build.add_argument("root_id")
+    build.add_argument("--wdp")
+    build.add_argument("--options", help="JSON file with build options, including reports and drawing_paths")
+    for name in ("electrical-show", "electrical-export"):
+        command = sub.add_parser(name)
+        command.add_argument("project_id")
+        if name == "electrical-show":
+            command.add_argument("--collection")
+            command.add_argument("--offset", type=int, default=0)
+            command.add_argument("--limit", type=int, default=50)
+            command.add_argument("--query")
+    trace = sub.add_parser("electrical-trace")
+    trace.add_argument("project_id")
+    trace.add_argument("device_id")
+    trace.add_argument("--terminal")
+    trace.add_argument("--domain", choices=["electrical", "network"], default="electrical")
+    compare = sub.add_parser("electrical-compare")
+    compare.add_argument("before_project_id")
+    compare.add_argument("after_project_id")
     args = parser.parse_args()
     from .config import Config
     from .service import DrawingService
@@ -49,7 +71,30 @@ def main():
 
         create_server(service, args.port).run(transport=args.transport)
         return
-    if args.command == "status":
+    if args.command.startswith("electrical-"):
+        from pathlib import Path
+
+        from .electrical import ElectricalService
+
+        electrical = ElectricalService(service)
+        if args.command == "electrical-build":
+            options = json.loads(Path(args.options).read_text(encoding="utf-8-sig")) if args.options else {}
+            if args.wdp:
+                options["electrical_project_path"] = args.wdp
+            result = electrical.build(args.root_id, **options)
+        elif args.command == "electrical-show":
+            result = (
+                electrical.query(args.project_id, args.collection, args.offset, args.limit, args.query)
+                if args.collection
+                else electrical.get(args.project_id)
+            )
+        elif args.command == "electrical-trace":
+            result = electrical.trace(args.project_id, args.device_id, args.terminal, args.domain)
+        elif args.command == "electrical-compare":
+            result = electrical.compare(args.before_project_id, args.after_project_id)
+        else:
+            result = electrical.export(args.project_id)
+    elif args.command == "status":
         result = service.status()
     elif args.command == "inventory":
         result = service.inventory(args.root_id, not args.all, args.offset, args.limit)

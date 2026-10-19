@@ -5,12 +5,30 @@ from __future__ import annotations
 import csv
 import io
 import json
+import os
 import re
 from pathlib import Path
 
 from .config import inside
 
 REPORT_KINDS = {"plc_connections", "from_to", "components", "panel", "network", "drawing_map"}
+REPORT_ALIASES = {
+    "components": {"TAGNAME": "TAG"},
+    "panel": {"TAGNAME": "TAG"},
+    "from_to": {
+        f"{stem}{n}": f"{side}_{target}"
+        for n, side in ((1, "FROM"), (2, "TO"))
+        for stem, target in (
+            ("CMP", "TAG"),
+            ("PIN", "TERM"),
+            ("INST", "INST"),
+            ("LOC", "LOC"),
+            ("HDL", "HDL"),
+            ("DWGIX", "DWGIX"),
+            ("FILENAME", "FILENAME"),
+        )
+    },
+}
 
 
 def read_text(path: Path) -> str:
@@ -42,10 +60,14 @@ def parse_wdp(path: Path, root: Path) -> dict:
             pending["subsection"] = line[2:]
         elif line.startswith("="):
             pending["section"] = line[1:]
-        elif line.lower().endswith((".dwg", ".dxf", ".dwt", ".dws")):
+        elif line.rstrip('"').lower().endswith((".dwg", ".dxf", ".dwt", ".dws")):
             normalized = line.replace("\\", "/").strip('"')
-            candidate = (path.parent / normalized).resolve()
+            # Reject outside-root declarations lexically before any filesystem resolution.
+            candidate = Path(os.path.abspath(path.parent / normalized))
             allowed = inside(candidate, root)
+            if allowed:
+                candidate = candidate.resolve()
+                allowed = inside(candidate, root)
             drawings.append(
                 {
                     "declared_path": line,
@@ -69,6 +91,14 @@ def parse_wdp(path: Path, root: Path) -> dict:
 def parse_report(path: Path, kind: str, field_map: dict | None = None) -> list[dict]:
     if kind not in REPORT_KINDS:
         raise ValueError("Unknown Electrical report kind")
+    if field_map is not None and (
+        not isinstance(field_map, dict)
+        or any(
+            not isinstance(k, str) or not isinstance(v, str) or not k.strip() or not v.strip()
+            for k, v in field_map.items()
+        )
+    ):
+        raise ValueError("field_map must map nonempty original headers to canonical field names")
     if path.suffix.lower() not in {".csv", ".tsv", ".json"}:
         raise ValueError("Report inputs must be CSV, TSV or a JSON array of row objects")
     text = read_text(path)
@@ -88,7 +118,7 @@ def parse_report(path: Path, kind: str, field_map: dict | None = None) -> list[d
     if len(rows) > 100_000:
         raise ValueError("Report exceeds 100000 rows")
     mapped = []
-    for index, row in enumerate(rows, 2):
+    for index, row in enumerate(rows, 1 if path.suffix.lower() == ".json" else 2):
         fields = {}
         for name, value in row.items():
             if name is None or isinstance(value, (dict, list)):
@@ -99,6 +129,11 @@ def parse_report(path: Path, kind: str, field_map: dict | None = None) -> list[d
             fields[key] = "" if value is None else str(value).strip()
         if not any(fields.values()):
             continue
+        for original, canonical in REPORT_ALIASES.get(kind, {}).items():
+            if original in fields:
+                if canonical in fields and fields[canonical] != fields[original]:
+                    raise ValueError("Conflicting canonical and Electrical report columns")
+                fields[canonical] = fields[original]
         requirements = {
             "plc_connections": {"PLCTAG", "PLCADDR"},
             "from_to": {"FROM_TAG", "TO_TAG"},

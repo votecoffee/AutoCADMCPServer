@@ -22,7 +22,9 @@ def create_server(service: DrawingService, port: int = 8796) -> FastMCP:
             "Use record handles or PDF page/bbox with source SHA-256 as evidence. "
             "Index roots in batches with cad_index_project before cad_search_project; inspect coverage. "
             "Native proxies, native table cells, references and raster-only PDF content may be incomplete. "
-            "Previews and indexes write only app-owned state. Pagination and truncation fields are explicit."
+            "Electrical analyses distinguish native report assertions, observed attributes and interpretation. "
+            "Highlighting changes only the display of an unchanged drawing already open in AutoCAD. "
+            "Previews, exports and indexes write only app-owned state. Pagination and truncation fields are explicit."
         ),
     )
 
@@ -213,4 +215,7 @@ def create_server(service: DrawingService, port: int = 8796) -> FastMCP:
         """
         return service.render(root_id, relative_path, page, layout, width)
 
+    from .electrical_server import register
+
+    register(tool, service)
     return mcp
