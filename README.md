@@ -139,6 +139,8 @@ Install `requirements-dev-lock.txt` and the editable package, run `python -m pyt
 
 The source tree keeps the shared service and workers in `src/autocad_mcp/`, reusable command line helpers in `scripts/`, synthetic fixtures and checks in `tests/`, and generic configuration examples in `examples/`. Machine configuration, runtime environments, customer inputs, extracted content and acceptance captures belong outside the tracked tree or under ignored `.local/`.
 
+Electrical normalization and project/report readers retain separate evidence classes for observed block attributes, interpreted content and explicitly imported Electrical report relationships.
+
 ## Maintainers
 
 [@votecoffee](https://github.com/votecoffee).

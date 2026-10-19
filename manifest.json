@@ -19,8 +19,8 @@
       "bytes": 1067
     },
     "README.md": {
-      "sha256": "5e70c3db39aad14812c1502d6e77f83843c8a1651c9e1db383ce9c586e84e850",
-      "bytes": 11791
+      "sha256": "c139cd262f17db7f27686538da9bafba5625a282560b04ddab2c4b96e84ad315",
+      "bytes": 11985
     },
     "VERIFICATION.md": {
       "sha256": "6dde98ad5fe1f5f4786d5215838c296cf0e55e971177a651f1c0970bea4fe634",
@@ -74,6 +74,14 @@
       "sha256": "0b6c81da6d80ac45bbc4e4d721a7abfe8180978af7b7f8512f73c8b40f8a6dd2",
       "bytes": 3893
     },
+    "src/autocad_mcp/electrical_model.py": {
+      "sha256": "26b91a16b5962e1991a751350d904bbf41de35593e3837ed3d2ee447ee56a4bf",
+      "bytes": 18332
+    },
+    "src/autocad_mcp/electrical_reports.py": {
+      "sha256": "ebcb949540609aa97c3684c6e3b3e3a82c3e0f5eae0d75cc316943f33c38d8de",
+      "bytes": 4668
+    },
     "src/autocad_mcp/extract.py": {
       "sha256": "0826d200a7ab7b04232491a615c3673d0ebacca7eb0416684d044cbe45710653",
       "bytes": 11834
@@ -93,6 +101,10 @@
     "tests/conftest.py": {
       "sha256": "c42602f12f17b3c71ffd5b576f4f3b5f8a89f6c97e7d892dd7c0ff98db46bd9f",
       "bytes": 1894
+    },
+    "tests/test_electrical_model.py": {
+      "sha256": "6980a9238c5aab38e2763006ee8183b6f0ca3de04112c875d1bea1b556a76a46",
+      "bytes": 7787
     },
     "tests/test_extraction.py": {
       "sha256": "6c2236772f98a982908f6658e87a7a6fdf8a14324a0d457aaf687679a8649e56",
