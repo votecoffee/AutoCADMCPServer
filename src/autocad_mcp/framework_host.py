@@ -15,7 +15,7 @@ from . import __version__
 from .config import Config, inside
 from .integration import HIGHLIGHT, OFFLINE_WRITES
 
-FRAMEWORK_VERSION = "0.15.0"
+FRAMEWORK_VERSION = "0.16.0"
 HOST_INSTRUCTIONS = (
     "AutoCAD MCP Server app-owned framework host. Use search_tools, then describe_service and "
     "describe_tool for drawing-engine/cad_get_workflow. Read that tool's current app workflow "
@@ -135,6 +135,8 @@ def prepare(config_path: Path, state: Path, *, port=8798, highlighting=False) ->
                         "protocol_mode": "legacy",
                         "discovery_cache_ttl_seconds": 0,
                         "watch_catalog": False,
+                        "max_argument_depth": 64,
+                        "max_argument_nodes": 100_000,
                         "timeout_seconds": 300,
                         "resource_id": "autocad-state-"
                         + hashlib.sha256(str(config.state).casefold().encode()).hexdigest()[:24],

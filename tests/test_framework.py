@@ -77,6 +77,7 @@ async def test_real_handlers_and_results_through_framework(
     publication = json.loads(Path(result["publication"]).read_bytes())["backends"][0]["service"]
     assert publication["session_mode"] == "transient" and publication["protocol_mode"] == "legacy"
     assert publication["discovery_cache_ttl_seconds"] == 0 and publication["watch_catalog"] is False
+    assert publication["max_argument_depth"] == 64 and publication["max_argument_nodes"] == 100_000
     async with framework_host.create_host(state, Path(result["publication"]), config) as host:
         first, second = host.client(), host.client()
         native = {tool.name: tool for tool in await create_server(service).list_tools()}
@@ -194,6 +195,40 @@ async def test_real_handlers_and_results_through_framework(
         assert set(runtime) == {"calls", "seconds"}
         assert runtime["calls"]["backend_call.returned"] >= 1
         assert all(isinstance(value, (int, float)) for group in runtime.values() for value in group.values())
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("shape", ["depth", "nodes"])
+async def test_structural_rejection_precedes_host_and_app_write_receipts(
+    drawing_service, tmp_path, monkeypatch, shape
+):
+    service, config, state, package, result = publish(drawing_service, tmp_path, monkeypatch)
+    original = (service.config.roots["test"] / "sample.dxf").read_bytes()
+    value = [0] * 100_001
+    if shape == "depth":
+        value = 0
+        for _ in range(70):
+            value = [value]
+    app_id, host_id = "app-shape-" + shape, "host-shape-" + shape
+    async with framework_host.create_host(state, Path(result["publication"]), config) as host:
+        client = host.client()
+        description = data(
+            await client.invoke("describe_tool", {"tool_id": "drawing-engine/cad_index_project"})
+        )
+        denied = await client.invoke(
+            "call_write_tool",
+            {
+                "tool_id": description["tool_id"],
+                "catalog_revision": description["catalog_revision"],
+                "request_id": host_id,
+                "arguments": {"root_id": "test", "request_id": app_id, "limit": value},
+            },
+        )
+        assert denied.is_error and "budget" in denied.content[0].text
+        missing = await client.invoke("get_request_status", {"request_id": host_id})
+        assert missing.is_error and "unknown request_id" in missing.content[0].text
+        assert Transactions(service.config.state, service.coordinator).get(app_id)["state"] == "not_found"
+    assert (service.config.roots["test"] / "sample.dxf").read_bytes() == original
 
 
 @pytest.mark.anyio
