@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "autocad",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Extract and trace local CAD and Electrical drawing evidence with AutoCAD MCP Server.",
   "author": {"name": "votecoffee"},
   "repository": "https://github.com/votecoffee/AutoCADMCPServer",

@@ -22,7 +22,7 @@ HOST_INSTRUCTIONS = (
     "through call_read_tool before selecting drawing operations. Use exact root/project IDs and "
     "current catalog revisions. Writes require separate host and app request IDs. Preserve source "
     "hashes, app authorization and uncertainty. No automatic cross-route retries or approval-mode overrides. "
-    "This standalone application does not require the Universal Tools plugin or daemon."
+    "This is AutoCAD's app-owned standalone host."
 )
 
 
@@ -37,7 +37,7 @@ def check_host_state(config: Config, state: Path):
     if any(inside(state, root) or inside(root, state) for root in [*config.roots.values(), config.state]):
         raise ValueError("Framework state must be separate from drawing roots and app business state")
     if any((state / "services").glob("*.json")):
-        raise ValueError("Use dedicated app framework state, not Universal Tools registrations")
+        raise ValueError("Use dedicated app framework state without existing service registrations")
 
 
 def check_receipts(config: Config):

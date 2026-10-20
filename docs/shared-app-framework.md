@@ -1,6 +1,6 @@
 # Shared app framework integration
 
-Version 0.4 adds an experimental app-owned host using `universal-codex-tools==0.14.0` and `universal_tools.framework.ApplicationHost`. Version 0.4.1 binds its dependency artifact to the pushed framework baseline at commit `52478c3868b18faf821ca22fd2bc38e5d0599b9b`. Both app and host target **MCP Python SDK 2.3.0**. This is the primary shared-code development path. AutoCAD keeps its independent application, CLI, native compatibility endpoint and standalone Codex plugin. Universal Tools is optional and is not required as a second plugin.
+Version 0.4 adds an experimental app-owned host using `universal-codex-tools==0.14.0` and `universal_tools.framework.ApplicationHost`. Version 0.4.1 binds its dependency artifact to the pushed framework baseline at commit `52478c3868b18faf821ca22fd2bc38e5d0599b9b`. Both app and host target **MCP Python SDK 2.3.0**. This is the primary shared-code development path. AutoCAD keeps its independent application, CLI, native compatibility endpoint and standalone Codex plugin. The shared package supplies code for this app-owned host; AutoCAD's standalone plugin is the only Codex integration.
 
 ```mermaid
 flowchart LR
@@ -39,7 +39,7 @@ python -m autocad_mcp --config .local/test-config.json framework-prepare --host-
 python -m autocad_mcp --config .local/test-config.json framework-serve --host-state .local/test-framework
 ```
 
-The host state must be separate from source roots, app business state and normal universal broker registrations. `framework-prepare` initializes private bearer-protected loopback settings, snapshots app code into immutable content-addressed deployments and atomically publishes the selected backend. It does not start a native application, install a plugin, change live registrations or migrate a workflow. Highlighting is excluded from the default write allowlist; `--include-highlighting` is an explicit additional policy choice requiring separate native acceptance.
+The host state must be separate from source roots, app business state and other applications' service registrations. `framework-prepare` initializes private bearer-protected loopback settings, snapshots app code into immutable content-addressed deployments and atomically publishes the selected backend. It does not start a native application, install a plugin, change live registrations or migrate a workflow. Highlighting is excluded from the default write allowlist; `--include-highlighting` is an explicit additional policy choice requiring separate native acceptance.
 
 In another process, `python -m autocad_mcp framework-proxy --host-state .local/test-framework` runs the app-owned stdio frontend against that already-running host. It does not start a universal daemon. Each frontend retains independent framework affinity; targets and results remain intentionally shared app state rather than private per-chat documents.
 
@@ -49,7 +49,7 @@ To prepare the standalone plugin for an authorized future framework pilot:
 python scripts/install_plugin.py --prepare-only --config .local/test-config.json --frontend framework --host-state .local/test-framework
 ```
 
-This only generates private bindings. Explicit later standalone installation uses the same options without `--prepare-only`. Do not run it as part of source compatibility work. Existing install choices are preserved; default installer bindings remain on the legacy endpoint until an explicitly authorized pilot selects the framework frontend. Optional universal registration also continues targeting the legacy endpoint; nested aggregation of the framework host is not certified.
+This only generates private bindings. Explicit later standalone installation uses the same options without `--prepare-only`. Do not run it as part of source compatibility work. Existing install choices are preserved; default installer bindings remain on the legacy endpoint until an explicitly authorized pilot selects the framework frontend. Setup provides no external registration or aggregation route.
 
 ## Publication and recovery boundaries
 
@@ -61,8 +61,8 @@ Use one selected route throughout an operation. Host and app write IDs/receipts 
 
 ## Validation and remaining gaps
 
-`tests/test_framework.py` uses real AutoCAD handlers with synthetic DXF/PDF inputs and private state. It compares legacy tool schemas/results, preserves original bytes, exercises app-state writes and separate receipts, rejects altered deployment/configuration bytes, and checks unknown inner outcomes. Two unchanged native MCP sessions discover a new disposable backend operation and revised workflow after refresh while their fourteen front-door definitions remain identical. A deliberately changed parser also executes through the snapshot's nested worker. A separate stdio app frontend runs without a universal daemon/plugin installation.
+`tests/test_framework.py` uses real AutoCAD handlers with synthetic DXF/PDF inputs and private state. It compares legacy tool schemas/results, preserves original bytes, exercises app-state writes and separate receipts, rejects altered deployment/configuration bytes, and checks unknown inner outcomes. Two unchanged native MCP sessions discover a new disposable backend operation and revised workflow after refresh while their fourteen front-door definitions remain identical. A deliberately changed parser also executes through the snapshot's nested worker. A separate stdio app frontend runs without an external daemon or plugin.
 
 The selected backend is transient and stateless: targets are explicit, snapshots/receipts are durable and no private native document session is retained. Framework calls to one backend remain serialized. Disposable warm-inspect benchmarks record direct service versus transient-host latency; process initialization adds material overhead, commonly seconds for small cached reads. These measurements do not establish native/host performance acceptance. A future retained/shared profile needs app-owned quiescence and retirement controls before it can improve that lifecycle safely.
 
-Actual Codex activation, multi-chat selection/lifetimes, UI/media display, live AutoCAD highlighting, native acceptance, recovery/admin UX, complete deployment dependency closure and optional nested universal aggregation remain unassessed. The current app has no form-approval workflow to migrate and no adapter for Codex chat approval settings. Model arguments cannot override app policy. This checkpoint is source/package and isolated protocol alignment, not permission or evidence to migrate an installed workflow.
+Actual Codex activation, multi-chat selection/lifetimes, UI/media display, live AutoCAD highlighting, native acceptance, recovery/admin UX, complete deployment dependency closure remain unassessed. The current app has no form-approval workflow to migrate and no adapter for Codex chat approval settings. Model arguments cannot override app policy. This checkpoint is source/package and isolated protocol alignment, not permission or evidence to migrate an installed workflow.

@@ -1,8 +1,7 @@
-"""Create private configuration and a validated-shape Universal Tools registration."""
+"""Create private application configuration while preserving existing roots."""
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
 
@@ -32,33 +31,7 @@ def main():
     temporary.write_text(json.dumps(config, indent=2), encoding="utf-8")
     Config.load(temporary)
     temporary.replace(config_path)
-    manifest = {
-        "schema_version": 1,
-        "id": "autocad",
-        "display_name": "AutoCAD MCP Server",
-        "description": "Extract DWG/DXF/PDF text, attributes, dimensions, layers, references and project search.",
-        "transport": {
-            "type": "stdio",
-            "command": sys.executable,
-            "args": ["-m", "autocad_mcp", "--config", str(config_path), "serve"],
-            "cwd": str(repo),
-            "env_vars": [],
-        },
-        "enabled": True,
-        "session_mode": "transient",
-        "allow_writes": True,
-        "allowed_write_tools": [
-            "cad_index_project",
-            "cad_render_preview",
-            "cad_build_electrical_project",
-            "cad_export_electrical_project",
-            "cad_highlight_source_object",
-        ],
-        "timeout_seconds": 300.0,
-    }
-    registration = local / "autocad.service.json"
-    registration.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    print(json.dumps({"config": str(config_path), "broker_registration": str(registration)}))
+    print(json.dumps({"config": str(config_path)}))
 
 
 if __name__ == "__main__":

@@ -31,9 +31,9 @@ def main():
     )
     parser.add_argument(
         "--codex-integration",
-        choices=["auto", "standalone", "broker", "none"],
+        choices=["auto", "standalone", "none"],
         default=None,
-        help="Default: auto for setup, none for --stdio; preserves saved choices",
+        help="Default: refresh standalone during setup; preserve saved skip/disabled choices; none for --stdio",
     )
     parser.add_argument("--port", type=int, default=8796, help="Loopback HTTP port (default: 8796)")
     parser.add_argument(

@@ -99,7 +99,7 @@ def prepare(repo: Path, config: Path | None = None, *, frontend="legacy", host_s
         "package": str(package),
         "plugin": "autocad@autocad-local",
         "transport": "stdio",
-        "broker_required": False,
+        "standalone": True,
         "frontend": frontend,
     }
 
@@ -111,9 +111,9 @@ def main():
     )
     parser.add_argument(
         "--mode",
-        choices=["auto", "standalone", "broker", "none"],
+        choices=["auto", "standalone", "none"],
         default="standalone",
-        help="Auto preserves existing choices and prefers only an accepted broker route",
+        help="Auto refreshes standalone while preserving skipped/disabled installation choices",
     )
     parser.add_argument("--config", type=Path, help="Use this app configuration in the generated binding")
     parser.add_argument("--frontend", choices=["legacy", "framework"], default="legacy")
@@ -127,7 +127,7 @@ def main():
     if args.prepare_only:
         print(json.dumps(prepare(repo, config, frontend=args.frontend, host_state=args.host_state)))
         return
-    plan = integration_plan(repo, config, args.mode)
+    plan = integration_plan(repo, args.mode)
     result = dict(plan)
     if plan["action"] == "install":
         result.update(prepare(repo, config, frontend=args.frontend, host_state=args.host_state))

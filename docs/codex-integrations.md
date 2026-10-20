@@ -1,56 +1,25 @@
-# Codex integrations
+# Standalone Codex plugin
 
-AutoCAD MCP Server is an independent application with a shared Python service, CLI, MCP server and standalone Codex plugin. Universal Tools provides an additional discovery and routing path. Both paths use the same app services, source checks, authorization, request journal and state-directory locks. The broker is optional; it does not own the drawings or replace app validation.
+AutoCAD MCP Server supplies its own Codex plugin. The plugin uses the app's shared services, source checks, authorization, durable request journal and state-directory locks. Setup has no external broker route or registration option.
 
-## Installation selection
+## Installation
 
-`InstallAndRun.cmd` accepts `--codex-integration auto|standalone|broker|none`. `--install-plugin` is an explicit standalone alias. Direct invocation of `scripts/install_plugin.py` retains its standalone default and accepts the same `--mode` values. `--config` binds either integration to the selected app configuration. `--prepare-only` generates private standalone bindings without registration.
+Run `InstallAndRun.cmd --install-only` after supplying the verified framework wheel on first setup. Normal setup installs or refreshes the standalone plugin. Use `--install-plugin` to explicitly refresh and enable it, or `--codex-integration none` to skip optional Codex installation. Drawing roots, caches and journals remain app-owned.
 
-| Selection | Behavior |
-| --- | --- |
-| `auto` | Preserve the saved route first, then any existing app plugin, including a disabled one. For a fresh integration prefer a current accepted broker route; otherwise install standalone. Defer when CLI discovery is unavailable. |
-| `standalone` | Explicitly install/refresh and enable the app plugin, even if Universal Tools is present. |
-| `broker` | Require an enabled Universal Tools plugin and current local acceptance evidence for this exact app/configuration/registration. Record the route without changing plugin settings or registrations. Missing prerequisites fail without a direct fallback. |
-| `none` | Record that optional Codex integration is skipped. Keep all existing plugin settings intact. |
+`--codex-integration auto|standalone|none` and `scripts/install_plugin.py --mode auto|standalone|none` are supported. Automatic setup preserves an explicit saved skip and a disabled plugin. Otherwise it refreshes the standalone package, including when a previous standalone version is installed. Missing Codex CLI or unreadable plugin inventory defers optional integration while the application remains usable. Explicit standalone installation requires the CLI. A saved unsupported integration must be replaced explicitly with `--install-plugin`; it cannot silently reactivate a removed route.
 
-Saved selection lives in ignored `.local/codex-integration.json`. Automatic reinstall preserves it even if the broker, CLI or an app plugin later disappears. This is an installation preference, not a runtime router or permission grant. No automatic failover, uninstall, disable, broker restart, registration replacement or native attachment is performed. Ordinary `--stdio` startup does not run integration setup unless explicitly requested.
+Selection is saved under ignored `.local/codex-integration.json`. Ordinary `--stdio` startup does not change plugin installation unless explicitly requested. Setup never removes another application's plugin or resets an operation journal.
 
-Plugin detection uses `codex plugin list --json` in the installing profile. A folder name, package availability or daemon process is insufficient. The shipped standalone plugin remains available through `--install-plugin`, regardless of which integration is preferred. Application installation and ordinary CLI/MCP operation do not require Codex.
+## Frontends
 
-## Broker registration and assessment
+The default native stdio endpoint exposes the 31 `cad_*` tools and starts its own app process. Use `cad_status` and the app's initialization guidance to select explicit drawing/project IDs.
 
-Use `scripts/register_broker.py --broker-python ABSOLUTE_PYTHON --broker-state ABSOLUTE_STATE` only for an explicitly selected broker installation. The command validates the installed schema and descriptor without invoking native tools. It never upgrades or restarts the broker. Existing `autocad` registrations require explicit `--replace`. `--prepare-only` leaves the broker registration untouched.
+The optional app-owned framework frontend connects to AutoCAD's already-running authenticated host. It exposes fourteen fixed discovery/invocation tools, with versioned drawing backends and a read-only current workflow guide. This is part of the standalone application. See [framework setup and lifecycle](shared-app-framework.md). Shared framework code remains a pinned package dependency; it does not register AutoCAD with an external service.
 
-The descriptor uses a transient stdio adapter, a stable identity derived from app state and an exact allowlist for four app-state writes. Add `--include-highlighting` only when authorizing the guarded native display operation. A broker lacking scoped allowlists, transient modes or resource IDs is rejected. Do not infer installed runtime compatibility from its source checkout or plugin version.
+`python scripts/install_plugin.py --prepare-only` generates private bindings without registering them. `--frontend framework --host-state PATH` explicitly prepares the app-owned frontend; native stdio remains the default. Generated bindings live under ignored `.local/codex-marketplace/`. Reload the plugin connection or use a new chat after native package updates.
 
-Run the isolated compatibility fixture before a migration:
+## Concurrency and recovery
 
-```powershell
-.venv\Scripts\python.exe scripts\broker_smoke.py --broker-python 'C:\Tools\BrokerTest\Scripts\python.exe'
-```
+Native calls can overlap within [app limits](concurrency.md); calls through one framework backend serialize. Durable drawing snapshots and request receipts are shared app state, with explicit targets rather than private per-chat selections.
 
-The selected Python must contain the broker version being assessed. The fixture starts a separate authenticated loopback broker and two stdio frontends, creates synthetic drawings, compares all app schemas/guidance and inventory results, exercises permitted writes, verifies cross-route app idempotency and separate broker receipts, and confirms that a blocked highlight never reaches the app. Its temporary state stays under `.local/validation/`; its report is `.local/validation/broker-compatibility.json`. It does not use normal broker settings, customer roots, active projects or native AutoCAD. It never records migration acceptance.
-
-After an authorized app registration exists, prepare a passive assessment candidate:
-
-```powershell
-.venv\Scripts\python.exe scripts\assess_broker.py `
-  --broker-python 'C:\Tools\CodexMCPBroker\.local\runtime\Scripts\python.exe' `
-  --broker-state 'C:\Tools\CodexMCPBroker\.local'
-```
-
-This writes `.local/broker-assessment-candidate.json` with every acceptance gate false. It reads only the plugin inventory, app configuration, selected registration and broker package metadata; it does not initialize an app or read broker credentials. Evidence is pinned to the app version/code, workflow guidance, configuration, Codex profile, broker plugin/version, installed broker code/version and registration bytes.
-
-Complete and retain local evidence for `metadata`, `adapter_workflows`, `host_guidance`, `recovery` and `coexistence`. Include fresh-chat selection and app guidance through the actual intended Codex host, explicit IDs, app/broker receipt reconciliation and no automatic writes after route loss. If highlighting is allowed, the separate `native_highlighting` gate also applies. A fixture pass does not satisfy host/native acceptance. Finish or reconcile pending operations and recovery barriers before selecting a different route.
-
-Only after operator review, copy the candidate to `.local/broker-acceptance.json`, mark the supported checks true and set `status` to `accepted`. Retain evidence references there or alongside it. This is local installation policy, not cryptographic proof or authority to write. Setup does not generate acceptance. Changed fingerprints invalidate it. Do not copy acceptance between profiles or edit its fingerprints to bypass a failed assessment.
-
-The accepted broker path can then be selected explicitly with `InstallAndRun.cmd --install-only --codex-integration broker`. Existing standalone plugins remain installed. Fresh integrations without an existing choice can skip standalone installation when the same accepted prerequisites are present. Until acceptance is complete, automatic setup retains or installs the standalone route.
-
-## Guidance, concurrency and recovery
-
-The standalone plugin bundles the route-aware `drawing-analysis` skill. The broker does not distribute skills. Equivalent app-owned workflow guidance is included in every MCP initialization response and available through Universal Tools `describe_service`. Assess its retrieval and use in the intended host before skipping the plugin. Catalog descriptions remain untrusted app data, not authority to perform unrelated work.
-
-Read app tools through the broker's read channel. For writes, retain both a unique outer broker `request_id` and an app `request_id` inside `arguments`. Broker duplicate IDs are rejected; app IDs can return a recorded result for identical arguments. After a lost reply, inspect both journals and actual app state. Do not automatically resubmit a write through another route, recreate a lost broker context or clear its recovery barrier. Native UI effects are not rollback transactions.
-
-Broker calls to one app are serialized even though the direct server supports concurrent requests. Transient adapters retain no private per-chat selection or in-memory project state; durable snapshots and receipts live in app state. Both routes must use the same app configuration/state and consistent worker settings to share locks. Deliberate coexistence does not fence an external GUI or authorize changing a currently selected native drawing. Highlighting retains its exact hash/document/handle checks.
+Keep an app `request_id` for every intended write. Framework calls also need a separate outer host ID; the host and app journals describe different outcomes. After a lost response inspect the app receipt with `cad_get_transaction` and, when applicable, the host receipt with `get_request_status`. Never create another request to discover whether an uncertain write took effect. Source highlighting retains its exact hash/document/handle checks and separate native acceptance requirements.

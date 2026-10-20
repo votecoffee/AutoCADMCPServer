@@ -24,7 +24,7 @@ def test_plugin_binding_is_local_independent_and_relocatable(tmp_path):
     python.parent.mkdir(parents=True)
     python.write_bytes(b"test placeholder; never executed")
     result = prepare(repo)
-    assert result["broker_required"] is False
+    assert result["standalone"] is True
     package = Path(result["package"])
     manifest = json.loads((package / "plugin.json").read_text(encoding="utf-8"))
     assert manifest["name"] == "autocad"
