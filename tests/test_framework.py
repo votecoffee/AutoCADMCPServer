@@ -198,6 +198,30 @@ async def test_real_handlers_and_results_through_framework(
 
 
 @pytest.mark.anyio
+async def test_replicated_deployment_rejected_without_changing_app_host(
+    drawing_service, tmp_path, monkeypatch
+):
+    from universal_tools.deployment import OAuthDeployment
+
+    _, config, state, _, result = publish(drawing_service, tmp_path, monkeypatch)
+    async with framework_host.create_host(state, Path(result["publication"]), config) as host:
+        active = (state / "framework/active.json").read_bytes()
+        deployment = OAuthDeployment(
+            issuer_url="https://identity.example",
+            resource_url="https://autocad.example/mcp",
+            token_verifier=object(),
+            scopes=("drawings.read",),
+            request_state_keys=(b"x" * 32,),
+            subscriptions=object(),
+            replicated=True,
+        )
+        with pytest.raises(ValueError, match="one owning process"):
+            host.create_server(deployment=deployment)
+        assert (state / "framework/active.json").read_bytes() == active
+        assert data(await host.client().invoke("broker_status", {}))["runtime"] is not None
+
+
+@pytest.mark.anyio
 @pytest.mark.parametrize("shape", ["depth", "nodes"])
 async def test_structural_rejection_precedes_host_and_app_write_receipts(
     drawing_service, tmp_path, monkeypatch, shape
