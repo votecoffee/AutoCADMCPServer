@@ -15,7 +15,7 @@ from . import __version__
 from .config import Config, inside
 from .integration import HIGHLIGHT, OFFLINE_WRITES
 
-FRAMEWORK_VERSION = "0.14.0"
+FRAMEWORK_VERSION = "0.15.0"
 HOST_INSTRUCTIONS = (
     "AutoCAD MCP Server app-owned framework host. Use search_tools, then describe_service and "
     "describe_tool for drawing-engine/cad_get_workflow. Read that tool's current app workflow "
@@ -68,7 +68,15 @@ def prepare(config_path: Path, state: Path, *, port=8798, highlighting=False) ->
     contents["worker.py"] = (package / "framework_entry.py").read_bytes()
     dependencies = {
         name: importlib.metadata.version(name)
-        for name in ("mcp", "universal-codex-tools", "anyio", "ezdxf", "PyMuPDF", "Pillow")
+        for name in (
+            "mcp",
+            "universal-codex-tools",
+            "anyio",
+            "opentelemetry-api",
+            "ezdxf",
+            "PyMuPDF",
+            "Pillow",
+        )
     }
     manifest = {
         "schema_version": 1,
@@ -124,6 +132,9 @@ def prepare(config_path: Path, state: Path, *, port=8798, highlighting=False) ->
                         "allow_writes": True,
                         "allowed_write_tools": list(OFFLINE_WRITES) + ([HIGHLIGHT] if highlighting else []),
                         "session_mode": "transient",
+                        "protocol_mode": "legacy",
+                        "discovery_cache_ttl_seconds": 0,
+                        "watch_catalog": False,
                         "timeout_seconds": 300,
                         "resource_id": "autocad-state-"
                         + hashlib.sha256(str(config.state).casefold().encode()).hexdigest()[:24],

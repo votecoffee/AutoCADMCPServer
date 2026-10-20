@@ -1,6 +1,6 @@
 # Shared app framework integration
 
-Version 0.4 adds an experimental app-owned host using `universal-codex-tools==0.14.0` and `universal_tools.framework.ApplicationHost`. Version 0.4.1 binds its dependency artifact to the pushed framework baseline at commit `52478c3868b18faf821ca22fd2bc38e5d0599b9b`. Both app and host target **MCP Python SDK 2.3.0**. This is the primary shared-code development path. AutoCAD keeps its independent application, CLI, native compatibility endpoint and standalone Codex plugin. The shared package supplies code for this app-owned host; AutoCAD's standalone plugin is the only Codex integration.
+Version 0.4 adds an experimental app-owned host using `universal-codex-tools==0.15.0` and `universal_tools.framework.ApplicationHost`. Version 0.4.3 binds its dependency artifact to the pushed framework baseline at commit `c9ddc97b0047f43e9028de675e3665cf5cee56b0`. Both app and host target **MCP Python SDK 2.3.0**. This is the primary shared-code development path. AutoCAD keeps its independent application, CLI, native compatibility endpoint and standalone Codex plugin. The shared package supplies code for this app-owned host; AutoCAD's standalone plugin is the only Codex integration.
 
 ```mermaid
 flowchart LR
@@ -17,11 +17,11 @@ The front door uses the framework's existing search, description, invocation, re
 
 Use the exact tested normal package dependency; do not vendor framework source, add a Git submodule or depend on a moving checkout. MCP is pinned at 2.3.0. Setup requires the framework wheel to declare that SDK version and rejects older pins; it never installs an older SDK to accommodate the framework. Windows pywin32 is an explicit app dependency for the existing guarded COM feature. Transitive runtime/development requirements remain hash locked. Coordinated development may explicitly install the framework checkout as an editable dependency in an isolated development environment, but acceptance uses a frozen wheel so concurrent edits cannot alter the test input. Distributed app metadata names the exact package version.
 
-There is no public framework package feed at this checkpoint. Obtain the verified 0.14.0 wheel separately. It is built from [framework commit 52478c3](https://github.com/votecoffee/CodexMCPBroker/commit/52478c3868b18faf821ca22fd2bc38e5d0599b9b), with SHA-256 `bee0f14b3cc6466bbb34226aa74d46e045d7025d98473398dd0c4b6ed2ed1a87`. This replaces the earlier development snapshot; the same package version alone does not identify equivalent bytes. A later framework artifact needs its own hash update and compatibility assessment. Setup verifies wheel identity, hash, RECORD inventory, SDK requirement and license before caching it under ignored `.local/wheels/` for ordinary dependency installation. An explicit verified wheel atomically replaces an older cached artifact; a failed copy leaves the existing cache intact. Setup reinstalls the locked framework so an unchanged version number cannot retain older installed code. The pip fallback reinstalls the runtime lock:
+There is no public framework package feed at this checkpoint. Obtain the verified 0.15.0 wheel separately. It is built from [framework commit c9ddc97](https://github.com/votecoffee/CodexMCPBroker/commit/c9ddc97b0047f43e9028de675e3665cf5cee56b0), with SHA-256 `c6f952298544cae19447ac622d35b07289d5425d4e2ecf10b3cd6f6d2909ee46`. This replaces the earlier development snapshot; the same package version alone does not identify equivalent bytes. A later framework artifact needs its own hash update and compatibility assessment. Setup verifies wheel identity, hash, RECORD inventory, SDK requirement and license before caching it under ignored `.local/wheels/` for ordinary dependency installation. An explicit verified wheel atomically replaces an older cached artifact; a failed copy leaves the existing cache intact. Setup reinstalls the locked framework so an unchanged version number cannot retain older installed code. The pip fallback reinstalls the runtime lock:
 
 ```powershell
-python scripts/framework_dependency.py 'C:\Packages\universal_codex_tools-0.14.0-py3-none-any.whl'
-.\InstallAndRun.cmd --framework-wheel 'C:\Packages\universal_codex_tools-0.14.0-py3-none-any.whl' --install-only
+python scripts/framework_dependency.py 'C:\Packages\universal_codex_tools-0.15.0-py3-none-any.whl'
+.\InstallAndRun.cmd --framework-wheel 'C:\Packages\universal_codex_tools-0.15.0-py3-none-any.whl' --install-only
 ```
 
 Manual installation uses `pip install --require-hashes --find-links C:\Packages -r requirements-lock.txt`, then `pip install --no-deps -e .`. Development uses the development lock similarly. A source ZIP does not redistribute the framework wheel or local bindings. Record artifact hashes and dependency versions in private acceptance evidence. An incompatible future SDK/native dependency set requires a separately managed out-of-process host; do not downgrade the app to force a shared environment. No native .NET/NuGet framework binding is assumed.
@@ -29,6 +29,22 @@ Manual installation uses `pip install --require-hashes --find-links C:\Packages 
 A limited direct-server import/constructor bridge keeps existing editable 0.3 installations on their already-installed SDK 1.30 usable until an explicitly authorized upgrade. It does not install or select SDK 1.x for new deployments. The new app package and shared host require SDK 2.3.0; the framework host has no older-SDK fallback.
 
 The framework's supported interoperability floor is SDK 2.2; its upstream matrix covers 2.2.0 and 2.3.0. AutoCAD's own dependency remains exactly 2.3.0. The downstream wire contract is the negotiated `2025-11-25` legacy handshake, independent of the SDK package version. SDK 2 Python fields use snake_case; wire serialization uses `model_dump(by_alias=True, mode="json")`, typed pagination and `_meta` for custom extensions. The framework captures retained connection identity across request-scoped session proxies. AutoCAD adds no owner ID argument or custom form/progress relay: the framework keeps those routes bound to the initiating request. There is no app form workflow or chat-settings permission adapter here, and no published .NET binding. SDK 1.x is outside the framework acceptance contract; the direct import bridge only avoids changing an existing installed endpoint during source alignment.
+
+## Framework 0.15 profile
+
+AutoCAD publishes a transient backend with explicit `protocol_mode: legacy`, `watch_catalog: false` and a zero discovery-cache TTL. Framework 0.15's modern features are opt-in; upgrading this dependency does not enable them or migrate an installed frontend.
+
+| Feature | AutoCAD profile |
+| --- | --- |
+| Modern discovery and `2026-07-28` wire revision | Off; the legacy handshake remains selected. |
+| Ownership | App-owned frontend affinity and explicit drawing targets; no model argument or `clientInfo` supplies identity. |
+| Approval continuations | No app form/continuation workflow is enabled. Existing app authorization, source checks and uncertain-outcome handling remain authoritative. |
+| Watched catalogs and retained discovery caches | Off for this transient backend. Invocation definitions and effects are still checked afresh. |
+| SSE response budgets | Backend workers use stdio. The host frontend retains existing HTTP budgets and the library's unbounded SSE event default. |
+| Diagnostics | Process-local aggregate counters and fixed-stage tracing; AutoCAD configures no exporter. Metrics are not operation receipts or proof of native completion. |
+| Skill resources | No `SkillCatalog` package is selected. Native skill packaging remains independent and needs installation/reload. |
+
+The app host also exposes the framework's read-only `broker://catalog` resource containing only a public generation identifier. Its historical URI and `broker_status` tool name belong to the shared framework API; neither registers an external route. Protocol fixtures check that this resource changes after an explicit backend refresh while the fourteen tool definitions stay fixed. They do not establish subscription display or native Codex skill activation. See the [upstream feature contract](https://github.com/votecoffee/CodexMCPBroker/blob/c9ddc97b0047f43e9028de675e3665cf5cee56b0/docs/sdk2-features.md) before assessing any future opt-in.
 
 ## Publish and run an isolated app host
 

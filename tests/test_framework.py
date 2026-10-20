@@ -74,6 +74,9 @@ async def test_real_handlers_and_results_through_framework(
     drawing_service, tmp_path, monkeypatch, record_property
 ):
     service, config, state, package, result = publish(drawing_service, tmp_path, monkeypatch)
+    publication = json.loads(Path(result["publication"]).read_bytes())["backends"][0]["service"]
+    assert publication["session_mode"] == "transient" and publication["protocol_mode"] == "legacy"
+    assert publication["discovery_cache_ttl_seconds"] == 0 and publication["watch_catalog"] is False
     async with framework_host.create_host(state, Path(result["publication"]), config) as host:
         first, second = host.client(), host.client()
         native = {tool.name: tool for tool in await create_server(service).list_tools()}
@@ -187,6 +190,10 @@ async def test_real_handlers_and_results_through_framework(
         record_property(
             "warm_inspect_latency_ms", json.dumps({"direct": direct, "framework_transient": samples})
         )
+        runtime = data(await first.invoke("broker_status", {}))["runtime"]
+        assert set(runtime) == {"calls", "seconds"}
+        assert runtime["calls"]["backend_call.returned"] >= 1
+        assert all(isinstance(value, (int, float)) for group in runtime.values() for value in group.values())
 
 
 @pytest.mark.anyio
@@ -272,6 +279,14 @@ async def test_same_two_native_clients_refresh_backend_without_frontdoor_reload(
             ]
             definitions = (await clients[0].list_tools()).model_dump(mode="json", by_alias=True)
             assert {tool["name"] for tool in definitions["tools"]} == FRONT_DOOR
+            assert {str(resource.uri) for resource in (await clients[0].list_resources()).resources} == {
+                "broker://catalog"
+            }
+            catalog = json.loads((await clients[0].read_resource("broker://catalog")).contents[0].text)
+            assert set(catalog) == {"generation"}
+            assert (
+                catalog["generation"] == data(await clients[0].call_tool("broker_status", {}))["generation"]
+            )
             guide = data(
                 await clients[0].call_tool("describe_tool", {"tool_id": "drawing-engine/cad_get_workflow"})
             )
@@ -297,6 +312,8 @@ async def test_same_two_native_clients_refresh_backend_without_frontdoor_reload(
             replacement = framework_host.prepare(config, state, port=port)
             assert replacement["backend_revision"] != result["backend_revision"]
             data(await clients[1].call_tool("refresh_services", {}))
+            next_catalog = json.loads((await clients[0].read_resource("broker://catalog")).contents[0].text)
+            assert set(next_catalog) == {"generation"} and next_catalog["generation"] != catalog["generation"]
             assert (await clients[0].call_tool("call_read_tool", payload)).is_error
             marker = data(
                 await clients[0].call_tool("describe_tool", {"tool_id": "drawing-engine/cad_fixture_marker"})

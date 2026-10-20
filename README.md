@@ -36,7 +36,7 @@ DWG conversion uses an independently installed ODA File Converter. DXF parsing u
 ### Dependencies
 
 - [Python](https://www.python.org/downloads/) 3.11 or later. The PowerShell examples use Python 3.13.
-- The verified local `universal-codex-tools==0.14.0` framework wheel built from the [pushed framework baseline](https://github.com/votecoffee/CodexMCPBroker/commit/52478c3868b18faf821ca22fd2bc38e5d0599b9b). It is a normal pinned Python dependency; no public package feed is shipped yet. MCP is pinned at **2.3.0**; setup rejects an older framework SDK pin instead of downgrading the app. See [framework dependency and verification](docs/shared-app-framework.md#dependency-and-packaging).
+- The verified local `universal-codex-tools==0.15.0` framework wheel built from the [pushed framework baseline](https://github.com/votecoffee/CodexMCPBroker/commit/c9ddc97b0047f43e9028de675e3665cf5cee56b0). It is a normal pinned Python dependency; no public package feed is shipped yet. MCP is pinned at **2.3.0**; setup rejects an older framework SDK pin instead of downgrading the app. See [framework dependency and verification](docs/shared-app-framework.md#dependency-and-packaging).
 - [ODA File Converter](https://www.opendesign.com/guestfiles/oda_file_converter), installed separately, for DWG extraction. Windows installations are detected under `C:/Program Files/ODA`; an absolute executable path can also be configured. DXF and PDF extraction do not need ODA.
 
 Optional source highlighting requires full AutoCAD running on Windows and pywin32, included explicitly in the Windows runtime lock. TrueView and ODA do not provide the live operation.
@@ -48,7 +48,7 @@ From a checkout on Windows:
 For Windows setup and a foreground compatibility server, run `InstallAndRun.cmd` in the project root. On the first 0.4 setup, supply `--framework-wheel PATH`; the verified wheel is cached privately for subsequent installs. Setup creates or reuses this checkout's `.venv`, installs hash-locked dependencies and the application, preserves existing configuration, and starts legacy loopback MCP HTTP at `http://127.0.0.1:8796/mcp`. On first setup it prompts for a drawing folder. Python 3.11 or newer is required; `uv` is used when available, with pip as the fallback. ODA is installed separately. Framework source alignment does not automatically select its new host for an installed workflow.
 
 ```powershell
-.\InstallAndRun.cmd --framework-wheel 'C:\Packages\universal_codex_tools-0.14.0-py3-none-any.whl' --install-only
+.\InstallAndRun.cmd --framework-wheel 'C:\Packages\universal_codex_tools-0.15.0-py3-none-any.whl' --install-only
 .\InstallAndRun.cmd
 .\InstallAndRun.cmd --install-only
 .\InstallAndRun.cmd --port 8797
@@ -123,7 +123,7 @@ Python clients use `ElectricalService(service).build("drawings", ...)` from `aut
 
 ### Shared app framework
 
-The primary shared-code development path uses the packaged `universal_tools.framework.ApplicationHost` behind AutoCAD's own standalone integration. Its fourteen stable native tools discover and invoke versioned `drawing-engine` backends. All 31 existing operations remain available there, plus a read-only current workflow guide. The authenticated app-owned loopback host and separate stdio frontends belong to this standalone application.
+The primary shared-code development path uses the packaged `universal_tools.framework.ApplicationHost` behind AutoCAD's own standalone integration. Its fourteen stable native tools discover and invoke versioned `drawing-engine` backends. All 31 existing operations remain available there, plus a read-only current workflow guide. The authenticated app-owned loopback host and separate stdio frontends belong to this standalone application. Framework 0.15 is pinned with an explicit legacy wire profile; modern ownership/continuations, watched catalogs, discovery caching and skill resources are not enabled by this update.
 
 Explicit isolated setup uses `framework-prepare`, `framework-serve` and `framework-proxy`. Published app code and nested extraction/render/table/highlight workers remain bound to immutable app snapshots. Original handlers, target/hash checks and app receipts remain authoritative. Backend feature/guide updates can refresh without changing the native front door; native skill/schema changes still require plugin update and Codex reload. Framework calls to one transient backend are serialized and add material startup latency. Actual Codex/native acceptance and recovery/admin UX remain separate work.
 
