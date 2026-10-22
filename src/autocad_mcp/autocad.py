@@ -13,6 +13,7 @@ from universal_tools.windows_resources import ProcessDriver
 
 from .owned_process import run_owned
 from .owned_resources import owned_resources
+from .profile import require_native
 from .service import sha256
 from .worker_launch import worker_command
 
@@ -59,6 +60,7 @@ def highlight_document(application, filename: str, handle: str, enabled: bool, e
 
 
 def run_worker(request_file, response_file):
+    require_native("AutoCAD highlighting worker")
     request = json.loads(Path(request_file).read_text(encoding="utf-8"))
     native_pid = None
     try:
@@ -123,6 +125,7 @@ def run_worker(request_file, response_file):
 
 
 def highlight(service, source: dict, enabled=True):
+    require_native("AutoCAD highlighting")
     drawing = source.get("drawing") or {}
     if not drawing.get("sha256") or not source.get("object_handle"):
         raise ValueError("Source has no bound drawing hash and object handle")

@@ -44,12 +44,19 @@ class StreamProcessDriver(ProcessDriver):
         with self._open(pid) as handle:
             if not handle.alive():
                 raise ProcessLookupError("Owned member already exited")
-            try:
-                return handle.identity
-            except OSError:
-                if not handle.alive():
-                    raise ProcessLookupError("Owned member exited during identity capture") from None
-                raise
+            deadline = time.monotonic() + 0.25
+            while True:
+                try:
+                    return handle.identity
+                except OSError as error:
+                    if not handle.alive():
+                        raise ProcessLookupError("Owned member exited during identity capture") from None
+                    # Windows can deny image lookup shortly before signaling exit.
+                    # Recheck only this retained handle, with a fixed budget. A live
+                    # unverifiable process still fails closed; never invent an image.
+                    if not isinstance(error, PermissionError) or time.monotonic() >= deadline:
+                        raise
+                    time.sleep(0.01)
 
     def create_suspended(self, argv, *, streams=None, env=None, max_processes=8, job_name=None):
         if streams is None:

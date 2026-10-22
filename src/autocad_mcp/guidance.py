@@ -56,9 +56,9 @@ Freshness describes the captured artifact, not a new validation. Root scope is r
 legacy artifacts without root authorization metadata must be regenerated. Catalog events are
 hints: refetch on reconnect. Fixed framework stdio proxies use the ordinary chunk reader because
 they do not forward native resource/skill methods. Never switch routes automatically.
-Inspect cad_concurrency_status when busy. Only call cad_highlight_source_object when the user
-requests highlighting in an unchanged source already open in full AutoCAD. Highlighting affects
-the display only, is serialized across app processes, and unknown outcomes need inspection.
+Inspect cad_concurrency_status when busy. This standalone offline profile accepts PDF/DXF and
+Electrical reports. DWG/DWT/DWS conversion and cad_highlight_source_object are unavailable;
+configuration, environment and request flags cannot enable native engineering execution.
 cad_status resource_ownership describes this supervisor's cached resource observations. Shared
 durable records support reviewed recovery; native/Codex acceptance remains separate. Never kill software by
 name or a stale PID, close an attached user-owned application or treat process exit as rollback.

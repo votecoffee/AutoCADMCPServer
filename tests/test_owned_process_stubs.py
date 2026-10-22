@@ -45,6 +45,63 @@ def test_identity_query_race_ignores_only_proven_exit_on_retained_handle(exited)
         driver.capture(1234)
 
 
+def test_transient_image_lookup_uses_one_retained_handle_and_a_bounded_retry(monkeypatch):
+    opens, queries, sleeps = [], [], []
+
+    class Handle:
+        def alive(self):
+            return True
+
+        @property
+        def identity(self):
+            queries.append("query")
+            if len(queries) == 1:
+                raise PermissionError("Synthetic short-lived image-query denial")
+            return {"pid": 1234, "created": "100", "executable": "verified.exe"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    driver = owned_process.StreamProcessDriver.__new__(owned_process.StreamProcessDriver)
+
+    def opened(pid):
+        opens.append(pid)
+        return Handle()
+
+    driver._open = opened
+    monkeypatch.setattr(owned_process.time, "sleep", lambda value: sleeps.append(value))
+    assert driver.capture(1234)["executable"] == "verified.exe"
+    assert opens == [1234] and len(queries) == 2 and sleeps == [0.01]
+
+
+def test_unverifiable_live_member_still_fails_after_retry_budget(monkeypatch):
+    clock = iter([10.0, 10.1, 10.3])
+    monkeypatch.setattr(owned_process.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(owned_process.time, "sleep", lambda value: None)
+
+    class Handle:
+        def alive(self):
+            return True
+
+        @property
+        def identity(self):
+            raise PermissionError("Still live and unverifiable")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    driver = owned_process.StreamProcessDriver.__new__(owned_process.StreamProcessDriver)
+    driver._open = lambda pid: Handle()
+    with pytest.raises(PermissionError, match="Still live and unverifiable"):
+        driver.capture(1234)
+
+
 @pytest.mark.parametrize("failure", [None, "job_attribute", "creation", "identity", "binding", "resume"])
 def test_durable_identity_precedes_resume_and_startup_failures_close_job(tmp_path, monkeypatch, failure):
     events, alive = [], {"worker": True}

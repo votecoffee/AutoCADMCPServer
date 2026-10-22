@@ -21,6 +21,7 @@ from .config import SUPPORTED, Config
 from .coordination import Coordinator
 from .owned_process import run_owned
 from .owned_resources import owned_resources
+from .profile import validate_profile
 from .worker_launch import worker_command
 
 
@@ -80,6 +81,7 @@ def paginate(rows: list, offset: int = 0, limit: int = 100) -> dict:
 
 class DrawingService:
     def __init__(self, config: Config):
+        validate_profile(config.execution_profile, config.oda_executable)
         self.config = config
         self.coordinator = Coordinator(
             config.state, config.lock_timeout_seconds, config.max_worker_processes, config.max_oda_processes
@@ -125,6 +127,9 @@ class DrawingService:
             "name": "AutoCAD MCP Server",
             "version": __version__,
             "display_version": __display_version__,
+            "execution_profile": self.config.execution_profile,
+            "native_operations_available": False,
+            "blocked_extensions": [".dwg", ".dwt", ".dws"],
             "roots": {k: str(v) for k, v in self.config.roots.items()},
             "state_dir": str(self.config.state),
             "supported_extensions": sorted(SUPPORTED),
@@ -161,7 +166,7 @@ class DrawingService:
                 "PDF text candidates",
             ],
             "electrical_analysis_requires_current_index": True,
-            "highlighting": "Windows ActiveX: already-running AutoCAD, unchanged open drawing, top-level source object only",
+            "highlighting": "Unavailable in the standalone offline profile; no native attachment or helper launch",
         }
 
     def inventory(self, root_id: str, supported_only=True, offset=0, limit=100) -> dict:

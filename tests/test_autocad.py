@@ -70,7 +70,9 @@ def test_rejections_happen_before_ui_mutation(tmp_path, condition):
     assert not doc.activated and not hasattr(doc.entity, "enabled")
 
 
-def test_unbound_evidence_rejected_without_native_access():
+def test_unbound_evidence_rejected_without_native_access(monkeypatch):
+    # Retained native internals are assessed only behind a stubbed release gate.
+    monkeypatch.setattr(autocad, "require_native", lambda operation: None)
     with pytest.raises(ValueError, match="bound drawing hash"):
         highlight(None, {"drawing": None, "object_handle": "AB"})
 
@@ -94,6 +96,8 @@ def test_display_failure_after_highlight_is_unknown_and_does_not_claim_rollback(
 def test_worker_releases_attachment_without_closing_or_saving_user_app(
     tmp_path, monkeypatch, dirty, registration_matches
 ):
+    # All COM/process APIs below are stubs; the real entrypoint remains refused.
+    monkeypatch.setattr(autocad, "require_native", lambda operation: None)
     path = tmp_path / "drawing.dwg"
     path.write_bytes(b"Synthetic drawing hash fixture; no CAD runtime")
     doc = Document(path)

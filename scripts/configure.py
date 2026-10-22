@@ -8,8 +8,10 @@ from pathlib import Path
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", action="append", required=True, help="name=absolute directory (repeatable)")
-    parser.add_argument("--oda", help="Absolute installed ODAFileConverter.exe")
+    parser.add_argument("--oda", help="Unavailable in the standalone offline profile")
     args = parser.parse_args()
+    if args.oda:
+        parser.error("ODA configuration is unavailable in the standalone offline profile")
     repo = Path(__file__).resolve().parents[1]
     local = repo / ".local"
     local.mkdir(exist_ok=True)
@@ -22,9 +24,7 @@ def main():
         if key in roots:
             raise ValueError("Duplicate root name")
         roots[key] = str(Path(directory).resolve(strict=True))
-    config = {"roots": roots, "state_dir": str(local / "state")}
-    if args.oda:
-        config["oda_executable"] = str(Path(args.oda).resolve(strict=True))
+    config = {"roots": roots, "state_dir": str(local / "state"), "execution_profile": "offline"}
     from autocad_mcp.config import Config
 
     temporary = local / "config.pending.json"

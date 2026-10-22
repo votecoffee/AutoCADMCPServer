@@ -3,7 +3,7 @@
 import re
 from datetime import datetime
 
-DISPLAY_VERSION = "26.1022.173932"
+DISPLAY_VERSION = "26.1022.180516"
 VERSION_TIMEZONE = "America/New_York"
 _TIMESTAMP = re.compile(r"([0-9]{1,2})\.([0-9]{1,4})\.([0-9]{1,6})\Z")
 

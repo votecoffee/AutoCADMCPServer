@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "version": "26.1022.173932",
-  "display_version": "26.1022.173932",
+  "version": "26.1022.180516",
+  "display_version": "26.1022.180516",
   "version_timezone": "America/New_York",
   "files": {
     ".gitattributes": {
@@ -25,12 +25,12 @@
       "bytes": 1067
     },
     "README.md": {
-      "sha256": "9150b9eb903c64ccb86faa806a70b83d0c34e3637d6bbf487b615ec6426c12bf",
-      "bytes": 23562
+      "sha256": "7ab5e5f2a202b18257f84035412893042b206850824bdc2f71274b59018177e0",
+      "bytes": 23658
     },
     "VERIFICATION.md": {
-      "sha256": "cde3a1890e56fc4d57763eb6a532a711320b0be96bdb956fbaaa63310d4caf0d",
-      "bytes": 12840
+      "sha256": "58aaee5645dde72abe1ed71f8151a21b3446c19474b18350cadcf68983277ec6",
+      "bytes": 13398
     },
     "assets/README.md": {
       "sha256": "8ea890834e8eaebd9855310d405310d4d4ef2437f1decd31513d4e844dd8b913",
@@ -55,6 +55,10 @@
     "docs/electrical-data.md": {
       "sha256": "99dec2f22e53913b21e0bcbdbdd60bcdfd9bea91fb54566c77f8e0fd5eb2b8e6",
       "bytes": 12879
+    },
+    "docs/offline-profile.md": {
+      "sha256": "f5a5bf4c4d0c4c64b8328716e90032967faa4860263af3d849ecd0d69cd4cad0",
+      "bytes": 4970
     },
     "docs/resource-ownership.md": {
       "sha256": "d9167d6fd9ccce30e162d10a1281e7532dea3e88f9023194eea4cd90f66ad66b",
@@ -81,11 +85,11 @@
       "bytes": 4989
     },
     "examples/config.example.json": {
-      "sha256": "1f482c6dc350a9b873033f82ac8f63e53babc1d29edf6558e1cf51dc331e87fe",
-      "bytes": 401
+      "sha256": "56fbca19c59cb9de30ac97c823b1d0f8024c798d389f14e0fc6cbb342ef3d114",
+      "bytes": 341
     },
     "plugins/autocad/.codex-plugin/plugin.json": {
-      "sha256": "0b3454d199438e029977984585f5a9052f6ee5f1e78bcc3b2f8a9e7c472c450b",
+      "sha256": "2766eb5945771d99dd6f22c91ca2a4995c0060be1abef4f75eb3e0345091a8e5",
       "bytes": 995
     },
     "plugins/autocad/.mcp.json": {
@@ -101,15 +105,15 @@
       "bytes": 177
     },
     "plugins/autocad/plugin.json": {
-      "sha256": "4920aceb6ccfe5f58f4b8a111378e823110c8e30778e6712f74c6e4dddfc3fe7",
+      "sha256": "4ae2b99e5fe9c2c6f97a7c2017af3af6039a37327b267a9775805d7b88fd23b6",
       "bytes": 1130
     },
     "plugins/autocad/skills/drawing-analysis/SKILL.md": {
-      "sha256": "b72be7454de62254d52e1398d6da0605c09ff99a8c512747779f7ce46ffaf470",
-      "bytes": 1339
+      "sha256": "2c86778d912761bb3a9a4d905ebdc6a4146522bac06eecd1c1776e5226b34ab7",
+      "bytes": 1340
     },
     "pyproject.toml": {
-      "sha256": "43f100cb5c0c4dc2add28ef0799a6c8cb52528ed6ded554ef31d335687f25d24",
+      "sha256": "574d969f0e535a818e6a3f72a74dc66d26c75e7827c9b69bb788b1f09084c88b",
       "bytes": 992
     },
     "requirements-dev-lock.txt": {
@@ -125,8 +129,8 @@
       "bytes": 5264
     },
     "scripts/configure.py": {
-      "sha256": "ea844e9550a9ac50f93583a8fdc84d274c7aa8f2c3c80e26467c0395b62619a1",
-      "bytes": 1384
+      "sha256": "e68fb3132900efc17ebc83ec72fa216f97f91f477d6062d77412b6e609ee6d59",
+      "bytes": 1437
     },
     "scripts/create_shortcut.py": {
       "sha256": "f5559f933b9c75ae05e04907afdc4a6d14ffccfe9ff4300fd7dbb08dc3f26b13",
@@ -141,8 +145,8 @@
       "bytes": 625
     },
     "scripts/install_plugin.py": {
-      "sha256": "5e27819ff05d865aeeb95e1a1206aecfcc49f83e2f35ec35122398083b3af488",
-      "bytes": 6853
+      "sha256": "1407a6e0258d5847b4546c8b45ab37fd5099ae5213bbb83e7b52ea081026d0e1",
+      "bytes": 6909
     },
     "scripts/launcher.py": {
       "sha256": "f5e1e864e06d6e41bec9385ae9cab4ce3a05636b5625c9778f0500fb33456307",
@@ -177,20 +181,20 @@
       "bytes": 6216
     },
     "src/autocad_mcp/autocad.py": {
-      "sha256": "ac80f332c10c605000e1ab408862cf3ee7c1bed79e1f6258bf2b1e4a433d4b81",
-      "bytes": 9967
+      "sha256": "5319d5e315983f00ee9e7ccd0238ce4f29b4729985490bf3f264c119e08c874b",
+      "bytes": 10096
     },
     "src/autocad_mcp/batch_jobs.py": {
       "sha256": "fdf2601cdf22cb92368c26ca937d85d08a39bcd04f6213433c398da0c6594c36",
       "bytes": 9671
     },
     "src/autocad_mcp/capabilities.py": {
-      "sha256": "180635c5c9b412a9e2ab5d1b225f648d62c20b5fb2c3cf70766918988edfd964",
-      "bytes": 5140
+      "sha256": "1987c2fbf381a5ed8f06c79c28b9e80b5700358f02e15f3a4b6d2c12f8ea7640",
+      "bytes": 5326
     },
     "src/autocad_mcp/config.py": {
-      "sha256": "97be89ae0c4db45d061be535602ca4754d7d06160a383730a154bc38fb09e2ef",
-      "bytes": 4948
+      "sha256": "322675178c2c1de8151fa4f4bdb27b150122bfc58713de4b6a0eed8b672537dd",
+      "bytes": 4623
     },
     "src/autocad_mcp/coordination.py": {
       "sha256": "20bd0e9082378446cd6c8c887c06179ddcbc3031f18a02e336ee6be7cc8286a6",
@@ -217,12 +221,12 @@
       "bytes": 6180
     },
     "src/autocad_mcp/electrical_server.py": {
-      "sha256": "2937106f1baba7c62b5db5602391d16c3b053fe94b464ca319574313e46fd61c",
-      "bytes": 6234
+      "sha256": "ab66a7d3343d88b5ed1227fcc1aa275f750add686b206be7b126b854aa95e76d",
+      "bytes": 6317
     },
     "src/autocad_mcp/extract.py": {
-      "sha256": "c129b1bac253a1790f2e4f744a202b3a0353b701d8553c3b27fc20abc7cc5f13",
-      "bytes": 11756
+      "sha256": "6f431d27908a9e9b5fe3df7931bb43c0dff1ce1de180b299b4e22c46ab31a49c",
+      "bytes": 11841
     },
     "src/autocad_mcp/framework_entry.py": {
       "sha256": "86950990361e5d3f44b040b94678714470d09c3897f1889ed56a463bae4f2c64",
@@ -233,8 +237,8 @@
       "bytes": 15490
     },
     "src/autocad_mcp/guidance.py": {
-      "sha256": "161760db7c2548bc9d99ad92f6763258b059c274fda5c5a5d405721756cb34f8",
-      "bytes": 5395
+      "sha256": "5470bb2105a6510836b3e74aec326c8f5dc73acc9c71aeb17bc0eb289a29aec7",
+      "bytes": 5388
     },
     "src/autocad_mcp/integration.py": {
       "sha256": "478a07548ebbc9de8aa34ef54b9d4967feea329cef58698ff06ea218a7a3641f",
@@ -249,12 +253,16 @@
       "bytes": 8857
     },
     "src/autocad_mcp/owned_process.py": {
-      "sha256": "a432f352fbd218a4e9a53013d768a52b6005c6f2d9a8323f740922a7c5851bee",
-      "bytes": 12613
+      "sha256": "4e8ef0cbc878bb36cd0146cce273e5386976b5ec75bc98089af394e3cdd8452b",
+      "bytes": 13107
     },
     "src/autocad_mcp/owned_resources.py": {
       "sha256": "7087541b6a988e244ff366b850a3d6cf0c2cb81cd009f358328bf2a5333c86e8",
       "bytes": 7683
+    },
+    "src/autocad_mcp/profile.py": {
+      "sha256": "064f7ebf77919b049ca84fdf2d762842f678c35376ecc00797a31cc9c6d54462",
+      "bytes": 753
     },
     "src/autocad_mcp/render.py": {
       "sha256": "ce33858b30d63cdb267342003a0ed67952d28237388a723f3cdbada02d85206a",
@@ -265,15 +273,15 @@
       "bytes": 15281
     },
     "src/autocad_mcp/service.py": {
-      "sha256": "8822a07fb1f3c95a2bf12c79fcc539b96baa95f3a51669a500da24a2b7938bc2",
-      "bytes": 25031
+      "sha256": "f69b036e00b22bec30fb359af5ab02badc600011044a8eac95befbfcf77dd2aa",
+      "bytes": 25307
     },
     "src/autocad_mcp/transactions.py": {
       "sha256": "ff24e42f36f03cc0aff98ed879727735d1b62f2c9c64680bc08045c4939e6955",
       "bytes": 6547
     },
     "src/autocad_mcp/version.py": {
-      "sha256": "4a7db28b12f5c5b51d2e316d28f2c4ce5bb4f1cd053130f44b82fa13383797f3",
+      "sha256": "5201edd32c1d82e9feaa629f1cb1a4b8406f919bb2d2d909bfe50879aa50dae0",
       "bytes": 1035
     },
     "src/autocad_mcp/worker_capture.py": {
@@ -285,16 +293,16 @@
       "bytes": 695
     },
     "src/autocad_mcp/workflow_guidance.py": {
-      "sha256": "f91015992fc85994a8e778c6b0a0da8c24d4a960b61343ffaf684a1d0d207c08",
-      "bytes": 7311
+      "sha256": "3213588a468026c03dc32842ffd60e35a73cfcffffcf777683221f9041355a53",
+      "bytes": 7312
     },
     "tests/conftest.py": {
       "sha256": "314efa0cfa6b840cf19a3b0d6171d9eb4a09d3d21e100b0725e6359da118e016",
       "bytes": 2080
     },
     "tests/test_autocad.py": {
-      "sha256": "26bfe4346a24d75d5fa764c0e129949e66b22c1a8cd1abeca4532d3853867c58",
-      "bytes": 5877
+      "sha256": "acb97cda59ff58f03307d1ae070c4cd80ec8163724468a0ed64ddef821c7fcc2",
+      "bytes": 6200
     },
     "tests/test_batch_artifacts.py": {
       "sha256": "6f2ee45db6c66a4336f7a066812a295e2dff629caa0b0c56562ebc3fa3ebac62",
@@ -344,21 +352,25 @@
       "sha256": "a009e039d7a67f40d32f916cf8598346d89b06c2772bc44df02b68a79e0b52fe",
       "bytes": 5341
     },
+    "tests/test_offline_profile.py": {
+      "sha256": "ce3398219cb73a98e95e69b0c169229e6f77385cd4483457dece322413be6357",
+      "bytes": 5175
+    },
     "tests/test_owned_inventory.py": {
       "sha256": "a5b135b48f4b1fe7114f7cdd8cc9ccd457940d1c9e6c17c23e384c6fdede395f",
       "bytes": 3427
     },
     "tests/test_owned_process_stubs.py": {
-      "sha256": "46b900fe1a5062ee8da28f21254cc1df7ff4bd888063dc10f3131580ce7b6bd0",
-      "bytes": 7116
+      "sha256": "de0a9f5ec1e6d5445848181b47d6fd608de4b581488ffb5c1348d0f71cb251bd",
+      "bytes": 8911
     },
     "tests/test_owned_resources.py": {
       "sha256": "f736742d9ebc594e3d4532058ae9f1bbb55e9fe13f0ab108272cfcba2082cac2",
       "bytes": 4992
     },
     "tests/test_plugin.py": {
-      "sha256": "ac75131d02f5cd93c307301cb3f737d963664710ada9438823d848a8184a42ec",
-      "bytes": 3073
+      "sha256": "d26b238aa4d10eb358373320a6e432c1e38c54194c3d233605abdceda9d1c814",
+      "bytes": 3156
     },
     "tests/test_protocol.py": {
       "sha256": "807a54c5bf33a1ca783f3573a25307f3937f1e30772b55deb14e82654637b501",

@@ -5,7 +5,9 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-SUPPORTED = {".dwg", ".dxf", ".dwt", ".dws", ".pdf"}
+from .profile import PROFILE, validate_profile
+
+SUPPORTED = {".dxf", ".pdf"}
 
 
 def inside(path: Path, root: Path) -> bool:
@@ -28,11 +30,13 @@ class Config:
     max_server_instances: int = 2
     max_index_jobs: int = 8
     lock_timeout_seconds: int = 180
+    execution_profile: str = PROFILE
 
     @classmethod
     def load(cls, filename: str | Path) -> Config:
         filename = Path(filename).resolve(strict=True)
         raw = json.loads(filename.read_text(encoding="utf-8-sig"))
+        validate_profile(raw.get("execution_profile", PROFILE), raw.get("oda_executable"))
         roots = {name: Path(value).resolve(strict=True) for name, value in raw["roots"].items()}
         if not roots or any(
             not name or "/" in name or "\\" in name or not p.is_dir() for name, p in roots.items()
@@ -41,13 +45,6 @@ class Config:
         state = Path(raw.get("state_dir", filename.parent / "state")).resolve()
         if any(inside(state, root) or inside(root, state) for root in roots.values()):
             raise ValueError("State and source roots must not overlap")
-        oda = raw.get("oda_executable")
-        if not oda and os.name == "nt":
-            candidates = sorted(Path("C:/Program Files/ODA").glob("ODAFileConverter*/ODAFileConverter.exe"))
-            oda = str(candidates[-1]) if candidates else None
-        executable = Path(oda).resolve(strict=True) if oda else None
-        if executable and (not executable.is_file() or not Path(oda).is_absolute()):
-            raise ValueError("ODA executable must be an absolute installed file path")
         concurrency = {}
         for key, default, low, high in (
             ("max_concurrent_requests", 4, 1, 32),
@@ -62,7 +59,7 @@ class Config:
             if type(value) is not int or not low <= value <= high:
                 raise ValueError(f"{key} must be an integer in {low}..{high}")
             concurrency[key] = value
-        return cls(roots, state, executable, **concurrency)
+        return cls(roots, state, execution_profile=PROFILE, **concurrency)
 
     def resolve(self, root_id: str, relative_path: str) -> Path:
         if root_id not in self.roots:

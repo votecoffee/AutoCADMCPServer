@@ -9,6 +9,7 @@ import ezdxf
 import pymupdf
 
 from .owned_process import run_owned
+from .profile import require_native
 
 
 def clean(value):
@@ -26,6 +27,7 @@ def clean(value):
 def convert(source: Path, executable: str | None) -> tuple[Path, dict]:
     if source.suffix.lower() == ".dxf":
         return source, {"engine": "ezdxf", "conversion": None}
+    require_native("ODA DWG/DWT/DWS conversion")
     if not executable:
         raise ValueError("DWG/DWT/DWS requires an installed ODA File Converter configured by the operator")
     output = source.parent / "converted"

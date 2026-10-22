@@ -39,6 +39,7 @@ def test_plugin_binding_is_local_independent_and_relocatable(tmp_path):
         == json.loads((template / "plugin.json").read_bytes())["version"]
     )
     assert set(servers) == {"autocad"}
+    assert servers["autocad"]["env"]["AUTOCAD_MCP_EXECUTION_PROFILE"] == "offline"
     assert servers["autocad"]["env"]["AUTOCAD_MCP_PLUGIN_DISPLAY_VERSION"] == __display_version__
     assert servers["autocad"]["command"] == str(python)
     assert servers["autocad"]["args"] == ["-m", "autocad_mcp", "--config", str(config), "serve"]

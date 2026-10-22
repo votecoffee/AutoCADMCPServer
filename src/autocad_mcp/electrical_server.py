@@ -2,6 +2,7 @@
 
 from .autocad import highlight
 from .electrical import ElectricalService
+from .profile import require_native
 
 
 def register(tool, drawings):
@@ -138,6 +139,7 @@ def register(tool, drawings):
         Requires unchanged disk source and unmodified open drawing. Never launches, opens or saves drawings.
         Changes UI highlighting only; nested placements and unbound report handles are rejected.
         """
+        require_native("AutoCAD highlighting")
         snapshot = service.load(project_id)
         device = next((d for d in snapshot["devices"] if d["id"] == device_id), None)
         if device is None or not 0 <= source_index < len(device["sources"]):

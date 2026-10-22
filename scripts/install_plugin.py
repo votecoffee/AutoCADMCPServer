@@ -40,6 +40,7 @@ def prepare(repo: Path, config: Path | None = None, *, frontend="legacy", host_s
         "args": ["-m", "autocad_mcp", "--config", str(config), "serve"],
         "cwd": str(repo),
         "env": {
+            "AUTOCAD_MCP_EXECUTION_PROFILE": "offline",
             "AUTOCAD_MCP_PLUGIN_VERSION": __version__,
             "AUTOCAD_MCP_PLUGIN_DISPLAY_VERSION": __display_version__,
         },

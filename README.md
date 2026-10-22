@@ -4,9 +4,11 @@
 
 Source-preserving local DWG, DXF, PDF and AutoCAD Electrical information extraction for MCP
 
-Extract drawing information through a shared Python service, command line interface and Model Context Protocol server. Device and PLC I/O inventories, connection tracing, equipment grouping, documented network inventory, consistency checks, revision comparison and JSON exports retain source evidence. Current guidance, bounded index jobs/artifacts and durable ownership of private worker trees retain AutoCAD's independent plugin and native endpoint. Experimental app-host deployment is blocked pending its SDK stdio ownership adapter. Native report assertions, observed attributes and interpretation stay distinct. Sources are preserved; optional guarded highlighting affects an unchanged drawing already open in AutoCAD. The repository is named `AutoCADMCPServer`; the Python distribution is `autocad-mcp-server`.
+Extract drawing information through a shared Python service, command line interface and Model Context Protocol server. Device and PLC I/O inventories, connection tracing, equipment grouping, documented network inventory, consistency checks, revision comparison and JSON exports retain source evidence. Current guidance, bounded index jobs/artifacts and durable ownership of private worker trees retain AutoCAD's independent plugin and native endpoint. Experimental app-host deployment is blocked pending its SDK stdio ownership adapter. Native report assertions, observed attributes and interpretation stay distinct. Sources are preserved; native highlighting is unavailable in the offline profile. The repository is named `AutoCADMCPServer`; the Python distribution is `autocad-mcp-server`.
 
-Current source release: **26.1022.173932**, stamped once in `America/New_York`. The app and both plugin manifests share the canonical package version `26.1022.173932`. [Versioning](docs/versioning.md) explains padded display timestamps, leading-zero normalization and release checks. Framework `0.20.0` and MCP SDK `2.3.0` remain independently pinned. Source/package verification does not establish installed or native acceptance.
+The selected profile is **direct standalone offline** on Windows: local PDF/DXF and Electrical report analysis. Native DWG/DWT/DWS conversion and AutoCAD highlighting are refused by code, configuration and environment gates. See [offline profile and launch scope](docs/offline-profile.md).
+
+Current source release: **26.1022.180516**, stamped once in `America/New_York`. The app and both plugin manifests share the canonical package version `26.1022.180516`. [Versioning](docs/versioning.md) explains padded display timestamps, leading-zero normalization and release checks. Framework `0.20.0` and MCP SDK `2.3.0` remain independently pinned. Source/package verification does not establish installed or native acceptance.
 
 ## Table of Contents
 
@@ -31,7 +33,7 @@ Current source release: **26.1022.173932**, stamped once in `America/New_York`. 
 
 Drawing review often requires finding text, part numbers, attributes, dimensions and references across several files. This server exposes those operations with source hashes and entity or page locations, so an MCP client can trace results back to the drawing. CLI and MCP operations use the same extraction service.
 
-DWG conversion uses an independently installed ODA File Converter. DXF parsing uses [ezdxf](https://ezdxf.readthedocs.io/), PDF extraction uses [PyMuPDF](https://pymupdf.readthedocs.io/), and the server uses the [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk). Backend limitations are described under [Extraction boundaries](#extraction-boundaries).
+Retained DWG conversion code is disabled in the standalone offline profile. DXF parsing uses [ezdxf](https://ezdxf.readthedocs.io/), PDF extraction uses [PyMuPDF](https://pymupdf.readthedocs.io/), and the server uses the [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk). Backend limitations are described under [Extraction boundaries](#extraction-boundaries).
 
 ## Install
 
@@ -39,15 +41,15 @@ DWG conversion uses an independently installed ODA File Converter. DXF parsing u
 
 - [Python](https://www.python.org/downloads/) 3.11 or later. The PowerShell examples use Python 3.13.
 - The verified local `universal-codex-tools==0.20.0` framework wheel built from the [pushed framework baseline](https://github.com/votecoffee/CodexMCPBroker/commit/5b2cac50ca24d21a15b732e0424bb02fd794e1fb). It is a normal pinned Python dependency; no public package feed is shipped yet. MCP is pinned at **2.3.0**; setup rejects an older framework SDK pin instead of downgrading the app. See [framework dependency and verification](docs/shared-app-framework.md#dependency-and-packaging).
-- [ODA File Converter](https://www.opendesign.com/guestfiles/oda_file_converter), installed separately, for DWG extraction. Windows installations are detected under `C:/Program Files/ODA`; an absolute executable path can also be configured. DXF and PDF extraction do not need ODA.
+- PDF/DXF extraction uses the locked Python libraries; no external converter or CAD application is needed. ODA conversion is unavailable in this offline release, including when ODA is installed.
 
-Optional source highlighting requires full AutoCAD running on Windows and pywin32, included explicitly in the Windows runtime lock. TrueView and ODA do not provide the live operation.
+AutoCAD highlighting is unavailable in this offline release. Retained native code and COM stubs do not authorize or activate it. No configuration, environment or tool option enables native execution.
 
 ODA and Autodesk binaries are not redistributed. Python runtime dependencies are installed from the hash-locked requirements file below.
 
 From a checkout on Windows:
 
-For Windows setup and a foreground compatibility server, run `InstallAndRun.cmd` in the project root. On the first 0.4 setup, supply `--framework-wheel PATH`; the verified wheel is cached privately for subsequent installs. Setup creates or reuses this checkout's `.venv`, installs hash-locked dependencies and the application, preserves existing configuration, and starts legacy loopback MCP HTTP at `http://127.0.0.1:8796/mcp`. On first setup it prompts for a drawing folder. Python 3.11 or newer is required; `uv` is used when available, with pip as the fallback. ODA is installed separately. Framework source alignment does not automatically select its new host for an installed workflow.
+For Windows setup and a foreground compatibility server, run `InstallAndRun.cmd` in the project root. On first setup, supply `--framework-wheel PATH`; the verified wheel is cached privately for subsequent installs. Setup creates or reuses this checkout's `.venv`, installs hash-locked dependencies and the application, preserves existing configuration, and starts legacy loopback MCP HTTP at `http://127.0.0.1:8796/mcp`. On first setup it prompts for a drawing folder. Python 3.11 or newer is required; `uv` is used when available, with pip as the fallback. Native conversion stays disabled. Framework source alignment does not automatically select its new host for an installed workflow.
 
 ```powershell
 .\InstallAndRun.cmd --framework-wheel 'C:\Packages\universal_codex_tools-0.20.0-py3-none-any.whl' --install-only
@@ -86,11 +88,11 @@ Server instances and worker descendants have explicit ownership limits and share
 ```powershell
 .venv\Scripts\python.exe -m autocad_mcp --version
 .venv\Scripts\python.exe -m autocad_mcp inventory drawings
-.venv\Scripts\python.exe -m autocad_mcp inspect drawings 'Assembly.dwg'
+.venv\Scripts\python.exe -m autocad_mcp inspect drawings 'Assembly.dxf'
 .venv\Scripts\python.exe -m autocad_mcp text drawings 'Electrical.pdf'
 .venv\Scripts\python.exe -m autocad_mcp index drawings --offset 0 --limit 2
 .venv\Scripts\python.exe -m autocad_mcp search drawings 'PART-123'
-.venv\Scripts\python.exe -m autocad_mcp render drawings 'Assembly.dwg'
+.venv\Scripts\python.exe -m autocad_mcp render drawings 'Assembly.dxf'
 .venv\Scripts\python.exe -m autocad_mcp serve
 ```
 
@@ -107,7 +109,7 @@ from autocad_mcp.config import Config
 from autocad_mcp.service import DrawingService
 
 service = DrawingService(Config.load(".local/config.json"))
-summary = service.inspect("drawings", "Assembly.dwg")
+summary = service.inspect("drawings", "Assembly.dxf")
 print(summary["source"]["sha256"])
 ```
 
@@ -124,7 +126,7 @@ Index the selected drawings first, then build an immutable electrical snapshot:
 .venv\Scripts\python.exe -m autocad_mcp electrical-export PROJECT_ID
 ```
 
-Replace IDs with returned values. Omit `--wdp` for ordinary DWG/DXF/PDF roots. Use `--options .local/build-options.json` for explicit drawing paths, native CSV/TSV/JSON reports, attribute mappings and wire layers. PDF tags stay separate candidates with page/bounding-box provenance. Analysis does not generate Electrical reports or read MDB databases directly. Unknown values, incomplete paths and ambiguous references remain explicit. See [Electrical data and report formats](docs/electrical-data.md) and the [JSON export schema](schemas/electrical-project.schema.json).
+Replace IDs with returned values. Omit `--wdp` for ordinary PDF/DXF roots. Use `--options .local/build-options.json` for explicit drawing paths, native CSV/TSV/JSON reports, attribute mappings and wire layers. PDF tags stay separate candidates with page/bounding-box provenance. Analysis does not generate Electrical reports or read MDB databases directly. Unknown values, incomplete paths and ambiguous references remain explicit. See [Electrical data and report formats](docs/electrical-data.md) and the [JSON export schema](schemas/electrical-project.schema.json).
 
 Python clients use `ElectricalService(service).build("drawings", ...)` from `autocad_mcp.electrical`, then its query, trace, compare and export methods. Keep build options and customer exports under ignored `.local/` or outside the checkout. Snapshot freshness is checked against current input hashes; historical snapshots remain readable for revision comparison.
 
@@ -154,7 +156,7 @@ This registers `autocad@autocad-local` using the Codex CLI after the verified fr
 
 Use a new local chat or reload the plugin connection to discover the current tools after installation. The local Codex CLI must be available. `python scripts/install_plugin.py --prepare-only` creates the local package without changing Codex registration. Packaging follows [OpenAI's plugin format](https://developers.openai.com/plugins/build/plugins).
 
-The direct server admits four active normal requests and 32 queued requests per process by default. Processes sharing app state coordinate a four-worker child-process budget, serialize ODA conversions by default, and serialize AutoCAD UI calls. The app-owned framework host additionally serializes calls to one backend. All state-changing tools accept `request_id` for durable replay and recovery; inspect `cad_get_transaction` after a lost response. Index batches commit per file. See [concurrency and transaction boundaries](docs/concurrency.md).
+The direct server admits four active normal requests and 32 queued requests per process by default. Processes sharing app state coordinate a four-worker child-process budget, refuse native conversion and AutoCAD UI calls in the offline profile. The app-owned framework host additionally serializes calls to one backend. All state-changing tools accept `request_id` for durable replay and recovery; inspect `cad_get_transaction` after a lost response. Index batches commit per file. See [concurrency and transaction boundaries](docs/concurrency.md).
 
 Direct stdio MCP configuration uses the absolute `.venv/Scripts/python.exe` command with arguments `['-m', 'autocad_mcp', '--config', 'ABSOLUTE_CONFIG_PATH', 'serve']` and the checkout as working directory. No shell invocation is needed.
 
@@ -192,11 +194,11 @@ Direct stdio MCP configuration uses the absolute `.venv/Scripts/python.exe` comm
 | `cad_check_drawing_consistency` | Duplicate tags, address conflicts, descriptions, references and panel differences |
 | `cad_compare_electrical_revisions` | Added, removed and changed device, I/O and connection records |
 | `cad_export_electrical_project` | Readback-verified JSON with source hashes and references; write-classified |
-| `cad_highlight_source_object` | Highlight/clear one top-level source object in an unchanged open AutoCAD drawing; write-classified |
+| `cad_highlight_source_object` | Refused in the offline profile before native access; write-classified |
 
 ## Extraction boundaries
 
-DWG is converted to a temporary ACAD2018 DXF using the installed ODA File Converter, with audit and recursion disabled. DXF is parsed by ezdxf. DWT and DWS are routed through the same conversion path and need individual acceptance; these formats are not established by DWG tests. PDF embedded text and positions are extracted using PyMuPDF. PDF tables are heuristic and previews require visual review.
+DXF is parsed by ezdxf. DWG/DWT/DWS conversion is unavailable in the standalone offline profile, even when an ODA converter is installed. These native formats remain unsupported inventory/report references. PDF embedded text and positions are extracted using PyMuPDF. PDF tables are heuristic and previews require visual review.
 
 CAD results include handles, layout/layer identifiers, INSERT transforms and attached attributes, polyline vertices, spline control/fit points, knots, weights and XDATA where exposed by ezdxf. Block definitions retain local coordinates. Electrical analysis expands supported planar nested inserts separately and diagnoses unsupported arrays/extrusions; raw entity queries retain definition coordinates. Dimension values are raw entity measurements; formatted labels, scaling, style overrides and tolerances require separate interpretation. Drawing header extents can be stale or sentinel values and are reported as stored.
 
