@@ -19,6 +19,14 @@ def test_auto_installs_or_refreshes_standalone_without_alternative_routes(previo
     assert (plan["route"], plan["action"]) == ("standalone", "install")
 
 
+@pytest.mark.parametrize("installed", [False, True])
+@pytest.mark.parametrize("enabled", [False, True])
+def test_retired_universal_plugin_inventory_never_changes_app_installation(installed, enabled):
+    plugins = {"universal-tools@universal-tools-local": {"installed": installed, "enabled": enabled}}
+    plan = select_route("auto", plugins, None)
+    assert (plan["route"], plan["action"]) == ("standalone", "install")
+
+
 def test_disabled_and_skipped_choices_are_preserved_until_explicit_install():
     plugins = {PLUGIN_ID: {"installed": True, "enabled": False}}
     assert select_route("auto", plugins, {"route": "standalone"})["action"] == "preserve"

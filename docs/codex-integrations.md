@@ -2,6 +2,8 @@
 
 AutoCAD MCP Server supplies its own Codex plugin. The plugin uses the app's shared services, source checks, authorization, durable request journal and state-directory locks. Setup has no external broker route or registration option.
 
+The architecture is a shared app framework plus an independent Windows manager, with each application retaining its own plugin and native skills. AutoCAD installation is independent of any unrelated or retired plugin inventory entry. The historical framework distribution/import names remain `universal-codex-tools` / `universal_tools`; they are Python package identities, not a universal Codex plugin or connection.
+
 ## Installation
 
 Run `InstallAndRun.cmd --install-only` after supplying the verified framework wheel on first setup. Normal setup installs or refreshes the standalone plugin. Use `--install-plugin` to explicitly refresh and enable it, or `--codex-integration none` to skip optional Codex installation. Drawing roots, caches and journals remain app-owned.

@@ -59,6 +59,8 @@ For unattended first setup, use `InstallAndRun.cmd --root "drawings=C:\Engineeri
 
 Setup defaults to `--codex-integration auto`, which installs or refreshes AutoCAD's standalone plugin. It preserves an explicitly saved skip or a disabled app plugin. An absent CLI or unreadable plugin inventory defers optional installation while leaving the application usable. Use `--codex-integration none` to skip plugin installation or `--install-plugin` to explicitly refresh and enable it. See [standalone plugin installation](docs/codex-integrations.md).
 
+Each application owns its Codex plugin and native skills; installation never depends on a universal plugin. The shared app framework and independent Windows manager supply common code and management. The historical Python names `universal-codex-tools` and `universal_tools` identify that package, without adding a universal Codex connection.
+
 For manual installation in PowerShell:
 
 ```powershell

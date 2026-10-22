@@ -23,8 +23,8 @@
       "bytes": 1067
     },
     "README.md": {
-      "sha256": "9d810ecfe6e1d3cee6e27c6b14d082143f81d34f4a72b211200024531999c59c",
-      "bytes": 22627
+      "sha256": "b0b2e3ca2bffb8c1d329c3f66afe1a804886e4860ee031af51263fef849fbf40",
+      "bytes": 22970
     },
     "VERIFICATION.md": {
       "sha256": "2dbdbc328a6a0f89962ec49f5c0098ae47937e14725cca93ce833f2e43545d56",
@@ -43,8 +43,8 @@
       "bytes": 45025
     },
     "docs/codex-integrations.md": {
-      "sha256": "b7fec61d2c9e391770ddcc6497e4db822c495ee140c09bf9c9ae3adb3a761cc9",
-      "bytes": 3231
+      "sha256": "7c8741f855fdf32d6a2319a3d94b2c6faa0225559b1d09f2a7e900735f20329a",
+      "bytes": 3649
     },
     "docs/concurrency.md": {
       "sha256": "596b8680825518988179cc99a7976cbb200e52cfee6ef572a7ef014a619e0bfc",
@@ -67,8 +67,8 @@
       "bytes": 16622
     },
     "docs/workflow-guidance.md": {
-      "sha256": "b002d9075f4aeb2487796ce61eac24d31f091dec74254af4256dc750c98e49fa",
-      "bytes": 4933
+      "sha256": "613973354447d5024399f263e891c94e07336f3986fd2e6947c9b02272c2a074",
+      "bytes": 4993
     },
     "examples/config.example.json": {
       "sha256": "927f223f44d2bef1520c092c28b9a064300a0427c86d49783931b7ad1c705ca9",
@@ -307,8 +307,8 @@
       "bytes": 3756
     },
     "tests/test_integration_policy.py": {
-      "sha256": "d1b62bbadd813d81e658fda616863363e70fe180b5a33392cf06c97fa9292c29",
-      "bytes": 3543
+      "sha256": "d686fdde01b228fcdb2e6a9e7d2cb5741e4403889a43a8b56b8ebf3ef24b72b4",
+      "bytes": 3966
     },
     "tests/test_lifetime.py": {
       "sha256": "224ddcac187621196fdd3b4bec82c157976bcaf1de03a662bdb0cf5e543501a0",
