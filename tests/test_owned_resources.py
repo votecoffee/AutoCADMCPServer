@@ -1,54 +1,132 @@
-"""Pure registry/stub checks: no process launch, MCP connection or native API."""
+"""Pure app facade/real durable-ledger checks with a harmless in-memory process driver."""
 
+import os
+import sys
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
+from universal_tools.resources import ResourceLedger
 
 from autocad_mcp.owned_resources import OwnedResources
 
 
-def test_only_exclusive_launches_accept_cleanup_and_snapshots_cannot_mutate_history():
-    resources = OwnedResources()
-    for ownership in ("attached_user_owned", "shared"):
-        with pytest.raises(ValueError, match="cannot be owned"):
-            resources.register(lambda: pytest.fail("Foreign cleanup"), "native", ownership=ownership)
-    resource = resources.register(lambda: None, "worker")
-    resources.started(resource, 42, 123456)
-    snapshot = resources.snapshot()
-    snapshot["active"][0]["pid"] = 999
-    assert resources.snapshot()["active"][0]["pid"] == 42
-    resources.finished(resource)
-    snapshot = resources.snapshot()
-    snapshot["recent"][0]["creation_identity"] = 0
-    assert resources.snapshot()["recent"][0]["creation_identity"] == 123456
-    assert resources.snapshot()["recent"][0]["state"] == "handles_released"
+class Driver:
+    def __init__(self):
+        self.processes, self.groups, self.effects = {}, [], []
+        self.processes[os.getpid()] = self.identity(os.getpid(), 1000)
+
+    @staticmethod
+    def identity(pid, created):
+        return {
+            "host_id": "a" * 64,
+            "pid": pid,
+            "created": str(created),
+            "executable": os.path.normcase(sys.executable),
+        }
+
+    def capture(self, pid):
+        return self.processes[pid]
+
+    def state(self, identity):
+        current = self.processes.get(identity["pid"])
+        return "absent" if current is None else "alive" if current == identity else "different"
+
+    def open(self, identity):
+        assert self.state(identity) == "alive"
+
+        class Handle:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                pass
+
+        return Handle()
+
+    def create_suspended(self, argv, **options):
+        driver = self
+        pid = 9000000 + len(self.groups)
+        identity = self.identity(pid, 2000 + len(self.groups))
+        self.processes[pid] = identity
+
+        class Group:
+            fail_stop = False
+
+            def __init__(self):
+                self.pid, self.identity = pid, identity
+
+            def resume(self):
+                driver.effects.append((pid, "resume"))
+
+            def identities(self):
+                return [identity] if driver.state(identity) == "alive" else []
+
+            def stop(self):
+                driver.effects.append((pid, "stop"))
+                if self.fail_stop:
+                    raise OSError("Synthetic stop failure")
+                driver.processes.pop(pid, None)
+
+            def close(self):
+                driver.processes.pop(pid, None)
+
+        group = Group()
+        self.groups.append(group)
+        return group
 
 
-def test_close_calls_owned_handles_once_and_never_admits_a_replacement():
-    resources, effects = OwnedResources(), []
-    for index in range(16):
-        resources.register(lambda index=index: effects.append(index), "worker")
-    with pytest.raises(RuntimeError, match="capacity"):
-        resources.register(lambda: None, "worker")
+def fixture(tmp_path, maximum=32):
+    driver = Driver()
+    ledger = ResourceLedger(tmp_path, driver=driver, max_active_per_app=maximum)
+    return OwnedResources(ledger=ledger), driver
+
+
+def test_concurrent_close_is_journaled_once_and_fences_new_launches(tmp_path):
+    resources, driver = fixture(tmp_path, maximum=2)
+    for _ in range(2):
+        resources.launch_worker(["synthetic"], (), "unit")
+    with pytest.raises(ValueError, match="limit"):
+        resources.launch_worker(["synthetic"], (), "unit")
     with ThreadPoolExecutor(4) as pool:
         snapshots = list(pool.map(lambda _: resources.close(), range(4)))
-    assert sorted(effects) == list(range(16))
+    assert sum(effect == "stop" for _, effect in driver.effects) == 2
     assert all(not snapshot["accepting"] for snapshot in snapshots)
-    with pytest.raises(RuntimeError, match="closed"):
-        resources.register(lambda: pytest.fail("Replacement was started"), "worker")
+    assert all(record.receipt.outcome == "terminated" for record in resources.ledger.records())
+    with pytest.raises(RuntimeError, match="closing"):
+        resources.launch_worker(["synthetic"], (), "unit")
 
 
-def test_failed_cleanup_keeps_uncertainty_without_replay():
-    resources, effects = OwnedResources(), []
-
-    def fail():
-        effects.append("called")
-        raise OSError("Synthetic handle failure")
-
-    resource = resources.register(fail, "worker")
-    resources.started(resource, 42, 123456)
-    snapshot = resources.close()
-    assert snapshot["active"][0]["state"] == "cleanup_unconfirmed"
-    assert snapshot["active"][0]["creation_identity"] == 123456
+def test_attached_and_foreign_generation_resources_are_not_closed(tmp_path, monkeypatch):
+    resources, driver = fixture(tmp_path)
+    driver.processes[8000000] = driver.identity(8000000, 500)  # Existing user software predates the owner.
+    attachment = resources.attach(8000000)
+    assert attachment.ownership == "attached" and attachment.cleanup_mode == "report"
+    foreign = resources.ledger.owner("autocad")
+    launch = foreign.launch(["synthetic"], "Other generation", allow_termination=True)
     resources.close()
-    assert effects == ["called"]
+    assert driver.state(attachment.process.model_dump()) == "alive"
+    assert driver.state(launch.group.identity) == "alive"
+    assert not any(effect == "stop" for _, effect in driver.effects)
+    resources.detach(attachment.resource_id, uncertain=True)
+    record = resources.ledger.get(attachment.resource_id)
+    assert record.state == "released" and record.recovery_barrier
+    snapshot = resources.snapshot()
+    snapshot["durable_resources"][0]["pid"] = 123
+    assert resources.snapshot()["durable_resources"][0]["pid"] == 8000000
+    monkeypatch.setattr(resources.ledger, "records", lambda: pytest.fail("Status performed ledger I/O"))
+    assert resources.snapshot()["attached_count"] == 0
+
+
+def test_uncertain_cleanup_keeps_original_receipt_without_replay(tmp_path):
+    resources, driver = fixture(tmp_path)
+    launch = resources.launch_worker(["synthetic"], (), "unit")
+    launch.group.fail_stop = True
+    with pytest.raises(RuntimeError, match="uncertain"):
+        launch.close()
+    record = resources.ledger.records()[0]
+    original = record.receipt.model_dump()
+    assert record.state == "uncertain" and original["outcome"] == "uncertain"
+    resources.close()
+    resources.close()
+    assert resources.ledger.get(record.resource_id).receipt.model_dump() == original
+    assert sum(effect == "stop" for _, effect in driver.effects) == 1

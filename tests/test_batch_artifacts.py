@@ -138,9 +138,10 @@ def test_owner_close_cancels_queued_jobs_and_rejects_new_work(drawing_service):
 def test_process_loss_preserves_unknown_job_and_one_effect(drawing_service, tmp_path):
     import json
     import os
-    import signal
     import subprocess
     import sys
+
+    from universal_tools.windows_resources import ProcessDriver
 
     service, source = drawing_service
     marker, info = tmp_path / "effect.txt", tmp_path / "private-job.json"
@@ -149,10 +150,11 @@ def test_process_loss_preserves_unknown_job_and_one_effect(drawing_service, tmp_
         "import json,sys,time,os\nfrom pathlib import Path\n"
         "from autocad_mcp.config import Config\nfrom autocad_mcp.service import DrawingService\n"
         "from autocad_mcp.batch_jobs import BatchJobs\n"
+        "from universal_tools.windows_resources import ProcessDriver\n"
         "s=DrawingService(Config.load(sys.argv[1]))\n"
         "def fake(*args,**kwargs):\n Path(sys.argv[2]).write_text('one-effect')\n time.sleep(60)\n"
         "s._index_file=fake\nj=BatchJobs(s).start('test',0,1)\n"
-        "j['owner_pid']=os.getpid()\np=Path(sys.argv[3]); t=p.with_suffix('.tmp'); t.write_text(json.dumps(j)); t.replace(p)\n"
+        "j['owner_identity']=ProcessDriver().capture(os.getpid())\np=Path(sys.argv[3]); t=p.with_suffix('.tmp'); t.write_text(json.dumps(j)); t.replace(p)\n"
         "time.sleep(60)\n",
         encoding="utf-8",
     )
@@ -168,8 +170,10 @@ def test_process_loss_preserves_unknown_job_and_one_effect(drawing_service, tmp_
             assert process.poll() is None and time.monotonic() < deadline
             time.sleep(0.02)
         job = json.loads(info.read_bytes())
-        assert job["owner_pid"] != os.getpid()
-        os.kill(job["owner_pid"], signal.SIGTERM)
+        assert job["owner_identity"]["pid"] != os.getpid()
+        with ProcessDriver().open(job["owner_identity"]) as owner:
+            owner.terminate()
+            assert owner.wait(5000)
         process.wait(timeout=10)
         deadline = time.monotonic() + 10
         while True:

@@ -1,0 +1,46 @@
+# Resource ownership and lifecycle
+
+AutoCAD 0.6 uses the reviewed shared framework 0.20.0 `ResourceLedger` and `ResourceOwner`. Each direct server is the actual supervisor of its private workers. A temporary registration helper never becomes the owner of surviving software. The independent AutoCAD plugin and native skill remain the only Codex installation; no universal plugin or connection is involved.
+
+## Launch paths
+
+| Path | Ownership and containment | Teardown and evidence |
+| --- | --- | --- |
+| Direct `serve` from the plugin | Codex launches the server; the server retains its own supervisor generation and exact Windows identity. Per-state owner admission defaults to two. | Existing SDK stdio remains unchanged. Captured-parent and non-consuming EOF fences bound owner lifetime; real MCP/Codex acceptance remains pending. |
+| Extraction, render, PDF-table helpers | Private Windows job, assigned during suspended creation. Durable identity is bound before resume. Only private diagnostic capture pipes and disconnected stdin are inherited. | Shared cleanup intent/receipt, verified empty job, retained handles; kernel last-handle closure contains unexpected owner death. |
+| ODA and descendants | Nested private job inside the recorded supervisor's named job. The helper verifies the matching durable record and its actual kernel membership before launching. | The original server remains the sole durable tree owner; nested converters never become replacement supervisors. The outer job contains unsampled descendants too. |
+| AutoCAD highlighting helper | Private helper tree, separate from the pre-existing native application. | Helper termination releases COM references without Quit/Close/save. Display uncertainty remains in the app write receipt. |
+| Existing AutoCAD attachment | `GetActiveObject` only. The worker identifies the application's HWND/PID and waits for the server to durably register a report-only `attached` claim before display dispatch. | The claim is released after the helper ends. An unknown result retains a native recovery barrier and links its resource ID to the operation result. The user application is never terminated, closed or saved. |
+| Codex version/inventory probe | Fixed `plugin list --json` command in a private owned job. A native CLI is preferred; the official npm entry is run by an explicit Node image. | Node/native descendants are contained. Unsupported shell wrappers report unavailable; there is no unowned shell fallback or plugin activation. |
+| Experimental app-host backend/proxy | Framework 0.20 SDK stdio creation has no integrated app-owned supervisor launch hook. Its background launcher cannot replace the MCP transport. | **CLI startup is blocked before any server/transport starts.** Preparation and in-process source assessment code remain; no automatic route switch or claim of complete backend ownership. |
+| App-launched shared native software | Not implemented. | No shared native instance is created or adopted; no guessed reference count or last-owner cleanup. Attached user applications stay protected across chats. |
+
+The ordinary installer is an explicit user-driven setup process, separate from the MCP server's runtime ownership scope. It does not start a manager. Plugin installation, setup subprocesses and deployment acceptance remain separate operations; the source checks do not constitute installation.
+
+## Durable records and cached status
+
+The ledger uses the same explicit private registry as management: `--management-registry` on `serve`, or `AUTOCAD_MCP_MANAGEMENT_REGISTRY`. CLI extraction can select the registry through that environment variable. Without an override, the shared Windows known-folder registry is used. Records retain host ID, supervisor generation, owner/resource PID, creation FILETIME, normalized executable image, ownership, containment, current members and cleanup receipts. Arguments, environment values, credentials and drawing contents are not stored in resource records.
+
+The framework serializes mutation with an OS lock and flushed atomic JSON replacement. Its default limit is 32 non-retired resources per application across generations, 4,096 history records and 32 KiB per record. The app does not erase old evidence to free capacity. A full/invalid ledger rejects new work. Private jobs cap active processes at eight; request/worker/ODA limits and fail-fast server leases remain independent. Index jobs default to at most eight active/queued/unknown intents per state, configurable from 1 through 32 and additionally bounded by normal request capacity.
+
+Diagnostic pipes drain into bounded memory tails instead of growing temporary files: 64 KiB per stream by default, with a fixed 2 MiB budget for complete Codex inventory JSON. Truncation is explicit; oversized inventory becomes unavailable rather than a partial accepted inventory. Capture pipes are unrelated to the MCP transport. The app bounds process counts/input sizes and diagnostic storage; it does not claim a hard native-worker RSS quota.
+
+`cad_status.resource_ownership` contains bounded cached summaries for the responding supervisor. Management exposes owned-tree/protected-attachment counts without scanning processes or contacting native software. Cache eviction does not delete durable records. Status is observation, never cleanup authorization; inspect the ledger's current revision before a reviewed operation. The independent manager can inspect durable records after an endpoint disappears.
+
+## Normal close, EOF and failure
+
+Normal shutdown fences new jobs, requests cooperative cancellation and closes private worker trees before management teardown. Each normal tree close journals intent and confirms that its job has no active processes. Startup failures close containment before returning an error; there is no uncontained fallback. A worker timeout or abrupt owner exit also bounds descendants. Windows process control retains checked handles; no cleanup uses a process-name search or stale PID inventory.
+
+Stdio lifetime fences observe pipe closure without reading protocol bytes. Parent/EOF loss allows normal shutdown three seconds, then exits only this server with code 70. A Windows venv launcher may outlive its own parent, so EOF is independently checked. HTTP has no stdio fence and still needs an explicit operator-owned terminal/service lifetime. These guards do not implement a detached restart supervisor. Source admission limits apply per configured state, not across arbitrary unrelated installations.
+
+An index batch commits per file. Cancellation cannot undo prior commits or prove that a running converter stopped before it finishes/fails. Hard termination retains original request/job uncertainty. Nothing retries a lost write, clears a receipt, changes routes, saves dirty documents or restarts software automatically.
+
+## Recovery and acceptance limits
+
+Use the independent manager's reviewed resource plan and exact current revision/request ID. Live owners, foreign/unverifiable hosts, identity mismatches, protected attached/shared/report-only claims, other retained claims and uncertain cleanup receipts/barriers prohibit guessed cleanup. PID reuse must leave the replacement process untouched. App-only reconciliation/barrier resolution requires independent evidence and preserves the original receipt; no such override is exposed as an AutoCAD MCP tool. Restart remains disabled.
+
+Pure/stub checks cover durable binding before resume, startup failures, cleanup deduplication, bounded admission, cached-status purity, attachment preservation and uncertain-receipt retention. Harmless Python process fixtures cover real Windows diagnostics, timeout/owner-death/EOF cleanup, nested membership and one supervisor owner, protected attachments, and reviewed recovery of an already-exited orphan. They use private registries and captured process identities, never native engineering software.
+
+These results do not establish real MCP client EOF/reconnect, installed plugin/manager UI, AutoCAD COM/native validity or production acceptance. Those require staged authorization and disposable targets. The experimental host's missing stdio ownership integration is an implementation gap, independently of the runtime hold. A native shared-instance lease/close workflow and an app operator UI for recovery attestations are also not implemented.
+
+See the [pinned shared contract](https://github.com/votecoffee/CodexMCPBroker/blob/5b2cac50ca24d21a15b732e0424bb02fd794e1fb/docs/resource-ownership.md), [record schema](https://github.com/votecoffee/CodexMCPBroker/blob/5b2cac50ca24d21a15b732e0424bb02fd794e1fb/examples/resource-record.schema.json), and Autodesk's [Application object](https://help.autodesk.com/cloudhelp/2024/DEU/AutoCAD-ActiveX-Reference/files/GUID-0225808C-8C91-407B-990C-15AB966FFFA8.htm) for the HWND identity source. Native COM acceptance remains separate from those API contracts.

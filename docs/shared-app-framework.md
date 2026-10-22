@@ -1,13 +1,15 @@
 # Shared app framework integration
 
-Version 0.4 adds an experimental app-owned host using `universal-codex-tools==0.18.0` and `universal_tools.framework.ApplicationHost`. Version 0.5.0 binds its dependency artifact to the pushed framework baseline at commit `7d8a0ccdc06598313061147ee8774837118a8861`. Both app and host target **MCP Python SDK 2.3.0**. This is the primary shared-code development path. AutoCAD keeps its independent application, CLI, native compatibility endpoint and standalone Codex plugin. The shared package supplies code for this app-owned host; AutoCAD's standalone plugin is the only Codex integration.
+Version 0.6 pins `universal-codex-tools==0.20.0` at commit `5b2cac50ca24d21a15b732e0424bb02fd794e1fb`, retaining **MCP Python SDK 2.3.0**. Shared code now supplies durable resource ownership to the direct server. AutoCAD keeps its independent application, CLI, native endpoint, plugin and skills. The experimental `ApplicationHost` remains a source prototype: **host/proxy CLI deployment is blocked** until its SDK stdio launch path has an app-owned ownership/containment adapter. The shared background launcher cannot replace MCP stdio. No route is changed automatically.
 
 ```mermaid
 flowchart LR
-    P[AutoCAD standalone plugin] --> F[App-owned stdio frontend]
-    F --> H[Authenticated app host: 14 fixed tools]
-    H --> B[Versioned drawing backend: MCP workers]
-    B --> S[Shared DrawingService and ElectricalService]
+    P[AutoCAD standalone plugin] --> N[Direct native server]
+    N --> S[Shared DrawingService and ElectricalService]
+    N --> R[Durable resource owner and private workers]
+    F[Blocked experimental frontend] -. ownership adapter required .-> H[App host prototype: 14 fixed tools]
+    H -. source assessment .-> B[Versioned backend prototype]
+    B --> S
     S --> D[Preserved drawing snapshots]
 ```
 
@@ -17,11 +19,11 @@ The front door uses the framework's existing search, description, invocation, re
 
 Use the exact tested normal package dependency; do not vendor framework source, add a Git submodule or depend on a moving checkout. MCP is pinned at 2.3.0. Setup requires the framework wheel to declare that SDK version and rejects older pins; it never installs an older SDK to accommodate the framework. Windows pywin32 is an explicit app dependency for the existing guarded COM feature. Transitive runtime/development requirements remain hash locked. Coordinated development may explicitly install the framework checkout as an editable dependency in an isolated development environment, but acceptance uses a frozen wheel so concurrent edits cannot alter the test input. Distributed app metadata names the exact package version.
 
-There is no public framework package feed at this checkpoint. Obtain the verified 0.18.0 wheel separately. It is built from [framework commit 7d8a0cc](https://github.com/votecoffee/CodexMCPBroker/commit/7d8a0ccdc06598313061147ee8774837118a8861), with SHA-256 `0c1084b424f079957ebd3bec763e609564aaef64cd1fedee78b61a45bfbc24ac`. This replaces the earlier development snapshot; the same package version alone does not identify equivalent bytes. A later framework artifact needs its own hash update and compatibility assessment. Setup verifies wheel identity, hash, RECORD inventory, SDK requirement and license before caching it under ignored `.local/wheels/` for ordinary dependency installation. An explicit verified wheel atomically replaces an older cached artifact; a failed copy leaves the existing cache intact. Setup reinstalls the locked framework so an unchanged version number cannot retain older installed code. The pip fallback reinstalls the runtime lock:
+There is no public framework package feed at this checkpoint. Obtain the verified 0.20.0 wheel separately. It is built from [framework commit 5b2cac5](https://github.com/votecoffee/CodexMCPBroker/commit/5b2cac50ca24d21a15b732e0424bb02fd794e1fb), with SHA-256 `a1b3777f8e8c1900e136a514d89ddb485a6bf4d69a525e3d24e1d04cd040efb3`. This replaces the earlier development snapshot; the same package version alone does not identify equivalent bytes. A later framework artifact needs its own hash update and compatibility assessment. Setup verifies wheel identity, hash, RECORD inventory, SDK requirement and license before caching it under ignored `.local/wheels/` for ordinary dependency installation. An explicit verified wheel atomically replaces an older cached artifact; a failed copy leaves the existing cache intact. Setup reinstalls the locked framework so an unchanged version number cannot retain older installed code. The pip fallback reinstalls the runtime lock:
 
 ```powershell
-python scripts/framework_dependency.py 'C:\Packages\universal_codex_tools-0.18.0-py3-none-any.whl'
-.\InstallAndRun.cmd --framework-wheel 'C:\Packages\universal_codex_tools-0.18.0-py3-none-any.whl' --install-only
+python scripts/framework_dependency.py 'C:\Packages\universal_codex_tools-0.20.0-py3-none-any.whl'
+.\InstallAndRun.cmd --framework-wheel 'C:\Packages\universal_codex_tools-0.20.0-py3-none-any.whl' --install-only
 ```
 
 Manual installation uses `pip install --require-hashes --find-links C:\Packages -r requirements-lock.txt`, then `pip install --no-deps -e .`. Development uses the development lock similarly. A source ZIP does not redistribute the framework wheel or local bindings. Record artifact hashes and dependency versions in private acceptance evidence. An incompatible future SDK/native dependency set requires a separately managed out-of-process host; do not downgrade the app to force a shared environment. No native .NET/NuGet framework binding is assumed.
@@ -30,7 +32,9 @@ The direct server and app-owned host require SDK 2.3.0 and the pinned framework.
 
 The framework's supported interoperability floor is SDK 2.2; its upstream matrix covers 2.2.0 and 2.3.0. AutoCAD's own dependency remains exactly 2.3.0. The default downstream wire contract is the negotiated `2025-11-25` legacy handshake, independent of the SDK package version. SDK 2 Python fields use snake_case; wire serialization uses `model_dump(by_alias=True, mode="json")`, typed pagination and `_meta` for custom extensions. The framework captures retained connection identity across request-scoped session proxies. AutoCAD adds no owner ID argument or custom form relay. Index progress uses the initiating SDK request context. There is no app form workflow or chat-settings permission adapter here, and no published .NET binding.
 
-## Framework 0.18 profiles
+## Framework 0.20 source profiles
+
+Publication settings and historical protocol fixtures below are source-assessment material. They do not clear the current SDK stdio ownership deployment blocker. Direct standalone deployment remains the selected application profile.
 
 AutoCAD defaults to a transient backend with explicit `protocol_mode: legacy`, `watch_catalog: false` and a zero discovery-cache TTL. The explicit `retained-modern` pilot uses dedicated state, shared retained workers, `2026-07-28`, watching and a two-second discovery ceiling. Setup preserves the selected standalone route and does not select this pilot. See [runtime profiles](runtime-features.md).
 
@@ -50,15 +54,17 @@ AutoCAD defaults to a transient backend with explicit `protocol_mode: legacy`, `
 | Remote OAuth and service credentials | The selected host stays on authenticated literal loopback. No remote endpoint, token provider, PKCE, workload grant or DPoP key is configured. |
 | Process ownership and Redis | One process owns the app host, journals and resource reservations. Replicated deployments are rejected. No Redis extra, shared Task repository or subscription bus is installed. |
 
-The app host also exposes the framework's read-only `broker://catalog` resource containing only a public generation identifier. Its historical URI and `broker_status` tool name belong to the shared framework API; neither registers an external route. Protocol fixtures check that this resource changes after an explicit backend refresh while the fourteen tool definitions stay fixed. They do not establish subscription display or native Codex skill activation. See the [upstream feature contract](https://github.com/votecoffee/CodexMCPBroker/blob/7d8a0ccdc06598313061147ee8774837118a8861/docs/sdk2-features.md) before assessing any future opt-in.
+The app host also exposes the framework's read-only `broker://catalog` resource containing only a public generation identifier. Its historical URI and `broker_status` tool name belong to the shared framework API; neither registers an external route. Protocol fixtures check that this resource changes after an explicit backend refresh while the fourteen tool definitions stay fixed. They do not establish subscription display or native Codex skill activation. See the [upstream feature contract](https://github.com/votecoffee/CodexMCPBroker/blob/5b2cac50ca24d21a15b732e0424bb02fd794e1fb/docs/sdk2-features.md) before assessing any future opt-in.
 
 The framework's `ExtensionServer` and real `SkillCatalog` publish the app's canonical guidance with list/get and hash-pinned resources. An explicit atomic admin publication updates connected clients; failed candidates leave the prior catalog intact. Immutable backend deployments capture generated guidance alongside their app source. The fixed stdio proxy forwards tools rather than native skill/resource methods, so ordinary guide/reference/artifact tools remain its supported surface. The focused packaged bootstrap remains the native plugin entrypoint. Protocol publication does not establish native host activation. See [workflow guidance](workflow-guidance.md).
 
-Tasks would need an actual app-owned job adapter with durable handles, current authorization on polling/result reads, source/review revision bindings, cooperative cancellation and lost-start reconciliation without replay. Existing index/preview/export calls are not automatically converted to Tasks. Task notifications would require owner-authorized subscriptions and explicit readback after reconnect; URL acceptance would acknowledge navigation only, with authentication or completion verified separately by the app. Likewise, future skill federation would require explicit trusted origins, complete manifest verification and app-owned activation consent. See the [extension contract](https://github.com/votecoffee/CodexMCPBroker/blob/7d8a0ccdc06598313061147ee8774837118a8861/docs/extension-development.md). Installing this dependency preserves the selected standalone frontend; optional features require separate app integration.
+Tasks would need an actual app-owned job adapter with durable handles, current authorization on polling/result reads, source/review revision bindings, cooperative cancellation and lost-start reconciliation without replay. Existing index/preview/export calls are not automatically converted to Tasks. Task notifications would require owner-authorized subscriptions and explicit readback after reconnect; URL acceptance would acknowledge navigation only, with authentication or completion verified separately by the app. Likewise, future skill federation would require explicit trusted origins, complete manifest verification and app-owned activation consent. See the [extension contract](https://github.com/votecoffee/CodexMCPBroker/blob/5b2cac50ca24d21a15b732e0424bb02fd794e1fb/docs/extension-development.md). Installing this dependency preserves the selected standalone frontend; optional features require separate app integration.
 
-The [deployment contract](https://github.com/votecoffee/CodexMCPBroker/blob/7d8a0ccdc06598313061147ee8774837118a8861/docs/deployment.md) distinguishes concurrent clients of one owning host from replicated native SDK servers. AutoCAD's SQLite receipts, native drawing sessions and process-local coordination do not implement the shared jobs, receipts and fencing needed by replicas. A durable task handle or SDK continuation would not make that state portable. Keep one owning host per app state, with explicit route selection and no native-effect retries or failover.
+The [deployment contract](https://github.com/votecoffee/CodexMCPBroker/blob/5b2cac50ca24d21a15b732e0424bb02fd794e1fb/docs/deployment.md) distinguishes concurrent clients of one owning host from replicated native SDK servers. AutoCAD's SQLite receipts, native drawing sessions and process-local coordination do not implement the shared jobs, receipts and fencing needed by replicas. A durable task handle or SDK continuation would not make that state portable. Keep one owning host per app state, with explicit route selection and no native-effect retries or failover.
 
 ## Publish and run an isolated app host
+
+`framework-prepare` only writes source publications. `framework-serve` and `framework-proxy` currently refuse before startup. The commands below describe the prototype's intended lifecycle and must not be treated as an accepted launch procedure.
 
 Use disposable drawings and a separate configuration during assessment. The following commands are explicit local administrative operations, not model tools:
 
@@ -97,4 +103,4 @@ Actual Codex activation, multi-chat selection/lifetimes, UI/media display, live 
 
 ## Tray management
 
-The owning host uses framework 0.18 ManagedService with cached component metadata and synchronized backend activity. Its standalone identity and transport are preserved. Restart is disabled because no surviving supervisor can fence all chats and reconcile effects. The tray interface does not add an external broker route or change drawing authorization. See [service management](service-management.md).
+The source host adapter uses framework 0.20 ManagedService with cached metadata and synchronized backend activity; its CLI deployment remains blocked. The direct server uses the same shared management/resource package. Restart is disabled because no surviving supervisor can fence all chats and reconcile native effects. The tray interface adds no external route or drawing authorization. See [service management](service-management.md).

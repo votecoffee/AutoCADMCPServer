@@ -22,6 +22,11 @@ from autocad_mcp.server import create_server
 from autocad_mcp.transactions import Transactions
 from autocad_mcp.workflow_guidance import Guidance
 
+pytestmark = pytest.mark.skipif(
+    not framework_host.SDK_STDIO_OWNERSHIP_SUPPORTED,
+    reason=framework_host.RUNTIME_BLOCKER,
+)
+
 FRONT_DOOR = {
     "broker_status",
     "list_services",

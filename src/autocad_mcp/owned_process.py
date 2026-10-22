@@ -1,243 +1,283 @@
-"""Bounded worker diagnostics and kernel ownership of Windows worker descendants.
+"""Private worker-file streams around the shared durable Windows ownership API.
 
-Windows 10+ job-list attributes bind ownership at creation, before any child code
-can run. Failure to establish ownership rejects launch; there is no plain-Popen
-fallback. Only app-created workers belong to the job, never an attached CAD app.
+This is not an MCP stdio launcher. Only bounded private capture pipes and disconnected
+stdin are inherited; the existing SDK transport remains separate.
 """
 
 import ctypes
+import json
 import os
+import re
 import signal
 import subprocess
-import tempfile
-import threading
-from contextlib import ExitStack
+import time
 from ctypes import wintypes as w
+from pathlib import Path
+
+from universal_tools.windows_resources import (
+    ContainedProcess,
+    ProcessDriver,
+    ProcessInfo,
+    StartupInfoEx,
+    checked,
+)
 
 from .owned_resources import owned_resources
+from .worker_capture import Captures
 
 DIAGNOSTIC_BYTES = 65_536
+TREE_ENV = "AUTOCAD_MCP_OWNED_TREE"
 
 
-def _tail(stream, encoding, errors):
-    stream.seek(max(0, stream.seek(0, os.SEEK_END) - DIAGNOSTIC_BYTES))
-    data = stream.read()
-    return data.decode(encoding, errors) if encoding else data
+class StreamProcessDriver(ProcessDriver):
+    """Equivalent atomic job creation, adding only private capture-handle streams."""
 
+    def __init__(self):
+        super().__init__()
+        if self.kernel:
+            self.kernel.GetExitCodeProcess.argtypes = [w.HANDLE, ctypes.POINTER(w.DWORD)]
+            self.kernel.GetExitCodeProcess.restype = w.BOOL
 
-class _Startup(ctypes.Structure):
-    _fields_ = [
-        ("cb", w.DWORD),
-        ("reserved", w.LPWSTR),
-        ("desktop", w.LPWSTR),
-        ("title", w.LPWSTR),
-        ("x", w.DWORD),
-        ("y", w.DWORD),
-        ("width", w.DWORD),
-        ("height", w.DWORD),
-        ("chars_x", w.DWORD),
-        ("chars_y", w.DWORD),
-        ("fill", w.DWORD),
-        ("flags", w.DWORD),
-        ("show", w.WORD),
-        ("reserved_size", w.WORD),
-        ("reserved_data", ctypes.POINTER(w.BYTE)),
-        ("stdin", w.HANDLE),
-        ("stdout", w.HANDLE),
-        ("stderr", w.HANDLE),
-    ]
+    def capture(self, pid):
+        # Short-lived launchers can exit after the first wait but before image
+        # lookup. Ignore only an exit proven on this same retained OS handle.
+        with self._open(pid) as handle:
+            if not handle.alive():
+                raise ProcessLookupError("Owned member already exited")
+            try:
+                return handle.identity
+            except OSError:
+                if not handle.alive():
+                    raise ProcessLookupError("Owned member exited during identity capture") from None
+                raise
 
+    def create_suspended(self, argv, *, streams=None, env=None, max_processes=8, job_name=None):
+        if streams is None:
+            return super().create_suspended(argv, env=env, max_processes=max_processes)
+        self._require_windows()
+        import msvcrt
 
-class _StartupEx(ctypes.Structure):
-    _fields_ = [("startup", _Startup), ("attributes", ctypes.c_void_p)]
+        import win32api
+        import win32job
 
-
-class _ProcessInfo(ctypes.Structure):
-    _fields_ = [("process", w.HANDLE), ("thread", w.HANDLE), ("pid", w.DWORD), ("tid", w.DWORD)]
-
-
-def _windows(args, timeout, streams, kind):
-    import msvcrt
-
-    import win32job
-
-    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-    init = kernel.InitializeProcThreadAttributeList
-    init.argtypes = [ctypes.c_void_p, w.DWORD, w.DWORD, ctypes.POINTER(ctypes.c_size_t)]
-    init.restype = w.BOOL
-    update = kernel.UpdateProcThreadAttribute
-    update.argtypes = [
-        ctypes.c_void_p,
-        w.DWORD,
-        ctypes.c_size_t,
-        ctypes.c_void_p,
-        ctypes.c_size_t,
-        ctypes.c_void_p,
-        ctypes.c_void_p,
-    ]
-    update.restype = w.BOOL
-    delete = kernel.DeleteProcThreadAttributeList
-    delete.argtypes = [ctypes.c_void_p]
-    create = kernel.CreateProcessW
-    create.argtypes = [
-        w.LPCWSTR,
-        w.LPWSTR,
-        ctypes.c_void_p,
-        ctypes.c_void_p,
-        w.BOOL,
-        w.DWORD,
-        ctypes.c_void_p,
-        w.LPCWSTR,
-        ctypes.POINTER(_StartupEx),
-        ctypes.POINTER(_ProcessInfo),
-    ]
-    create.restype = w.BOOL
-    wait = kernel.WaitForSingleObject
-    wait.argtypes = [w.HANDLE, w.DWORD]
-    wait.restype = w.DWORD
-    code = kernel.GetExitCodeProcess
-    code.argtypes = [w.HANDLE, ctypes.POINTER(w.DWORD)]
-    code.restype = w.BOOL
-    close = kernel.CloseHandle
-    close.argtypes = [w.HANDLE]
-    close.restype = w.BOOL
-    times = kernel.GetProcessTimes
-    times.argtypes = [w.HANDLE, *([ctypes.POINTER(w.FILETIME)] * 4)]
-    times.restype = w.BOOL
-    resume = kernel.ResumeThread
-    resume.argtypes, resume.restype = [w.HANDLE], w.DWORD
-
-    def checked(success):
-        if not success:
-            raise ctypes.WinError(ctypes.get_last_error())
-
-    job = win32job.CreateJobObject(None, None)
-    job_guard = threading.Lock()
-    job_closed = False
-
-    def stop_job():
-        nonlocal job_closed
-        with job_guard:
-            if not job_closed:
-                job.Close()
-                job_closed = True
-
-    attributes_ready = False
-    resource_id = None
-    info = _ProcessInfo()
-    handles = []
-    try:
-        limits = win32job.QueryInformationJobObject(job, win32job.JobObjectExtendedLimitInformation)
-        limits["BasicLimitInformation"]["LimitFlags"] = (
-            win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | win32job.JOB_OBJECT_LIMIT_ACTIVE_PROCESS
-        )
-        limits["BasicLimitInformation"]["ActiveProcessLimit"] = 8
-        win32job.SetInformationJobObject(job, win32job.JobObjectExtendedLimitInformation, limits)
-        resource_id = owned_resources.register(stop_job, kind)
-        size = ctypes.c_size_t()
-        init(None, 2, 0, ctypes.byref(size))
-        if not size.value:
-            raise ctypes.WinError(ctypes.get_last_error())
-        buffer = ctypes.create_string_buffer(size.value)
-        checked(init(buffer, 2, 0, ctypes.byref(size)))
-        attributes_ready = True
-        handles = [msvcrt.get_osfhandle(stream.fileno()) for stream in streams]
-        for handle in handles:
-            os.set_handle_inheritable(handle, True)
-        inherited = (w.HANDLE * len(handles))(*handles)
-        jobs = (w.HANDLE * 1)(int(job))
-        # PROC_THREAD_ATTRIBUTE_HANDLE_LIST and PROC_THREAD_ATTRIBUTE_JOB_LIST.
-        checked(update(buffer, 0, 0x20002, inherited, ctypes.sizeof(inherited), None, None))
-        checked(update(buffer, 0, 0x2000D, jobs, ctypes.sizeof(jobs), None, None))
-        startup = _StartupEx()
-        startup.startup.cb = ctypes.sizeof(startup)
-        startup.startup.flags = 0x100  # STARTF_USESTDHANDLES
-        startup.startup.stdin, startup.startup.stdout, startup.startup.stderr = handles
-        startup.attributes = ctypes.cast(buffer, ctypes.c_void_p)
-        command = ctypes.create_unicode_buffer(subprocess.list2cmdline(args))
-        checked(
-            create(
-                args[0],
-                command,
-                None,
-                None,
-                True,
-                0x08080004,  # NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED
-                None,
-                None,
-                ctypes.byref(startup),
-                ctypes.byref(info),
+        if not isinstance(argv, (tuple, list)) or not 1 <= len(argv) <= 256:
+            raise ValueError("Use bounded trusted worker argv")
+        if any(not isinstance(value, str) or "\0" in value for value in argv):
+            raise ValueError("Invalid worker arguments")
+        if not Path(argv[0]).is_absolute() or not Path(argv[0]).is_file():
+            raise ValueError("Use an existing absolute worker executable")
+        if type(max_processes) is not int or not 1 <= max_processes <= 8 or len(streams) != 3:
+            raise ValueError("Invalid private worker bounds")
+        command = subprocess.list2cmdline(argv)
+        if len(command.encode("utf-16-le")) > 65532:
+            raise ValueError("Worker command exceeds Windows limit")
+        environment = None
+        if env is not None:
+            if not isinstance(env, dict) or any(
+                not isinstance(key, str)
+                or not key
+                or "=" in key
+                or "\0" in key
+                or not isinstance(value, str)
+                or "\0" in value
+                for key, value in env.items()
+            ):
+                raise ValueError("Invalid worker environment")
+            block = "\0".join(
+                f"{key}={value}" for key, value in sorted(env.items(), key=lambda row: row[0].upper())
             )
-        )
-        creation, exited, cpu_kernel, cpu_user = (w.FILETIME() for _ in range(4))
-        checked(
-            times(
-                info.process,
-                ctypes.byref(creation),
-                ctypes.byref(exited),
-                ctypes.byref(cpu_kernel),
-                ctypes.byref(cpu_user),
-            )
-        )
-        owned_resources.started(
-            resource_id, info.pid, (creation.dwHighDateTime << 32) | creation.dwLowDateTime, suspended=True
-        )
-        previous_count = resume(info.thread)
-        if previous_count != 1:
-            raise RuntimeError("Owned worker did not resume from its expected suspended state")
-        owned_resources.resumed(resource_id)
-        for handle in handles:
-            os.set_handle_inheritable(handle, False)
-        result = wait(info.process, min(int(timeout * 1000), 0xFFFFFFFE))
-        if result == 258:  # WAIT_TIMEOUT
-            raise subprocess.TimeoutExpired(args, timeout)
-        if result != 0:
-            raise ctypes.WinError(ctypes.get_last_error())
-        exit_code = w.DWORD()
-        checked(code(info.process, ctypes.byref(exit_code)))
-        return exit_code.value
-    finally:
-        # Last noninherited job handle closes even on owner death; descendants
-        # cannot retain stdout pipes or a converter after this scope ends.
+            if len(block.encode("utf-16-le")) > 2 * 1024 * 1024:
+                raise ValueError("Worker environment exceeds budget")
+            environment = ctypes.create_unicode_buffer(block + "\0\0")
+        job = win32job.CreateJobObject(None, job_name or "")
+        if job_name and win32api.GetLastError() == 183:
+            job.Close()
+            raise ValueError("Named worker containment already exists; ownership not adopted")
+        ready, info, handles = False, None, []
+        kernel = self.kernel
         try:
-            stop_job()
+            limits = win32job.QueryInformationJobObject(job, win32job.JobObjectExtendedLimitInformation)
+            limits["BasicLimitInformation"]["LimitFlags"] = (
+                win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | win32job.JOB_OBJECT_LIMIT_ACTIVE_PROCESS
+            )
+            limits["BasicLimitInformation"]["ActiveProcessLimit"] = max_processes
+            win32job.SetInformationJobObject(job, win32job.JobObjectExtendedLimitInformation, limits)
+            size = ctypes.c_size_t()
+            kernel.InitializeProcThreadAttributeList(None, 2, 0, ctypes.byref(size))
+            if not size.value:
+                raise ctypes.WinError(ctypes.get_last_error())
+            attributes = ctypes.create_string_buffer(size.value)
+            checked(kernel.InitializeProcThreadAttributeList(attributes, 2, 0, ctypes.byref(size)))
+            ready = True
+            handles = [msvcrt.get_osfhandle(stream.fileno()) for stream in streams]
+            for handle in handles:
+                os.set_handle_inheritable(handle, True)
+            inherited = (w.HANDLE * 3)(*handles)
+            jobs = (w.HANDLE * 1)(int(job))
+            checked(
+                kernel.UpdateProcThreadAttribute(
+                    attributes, 0, 0x20002, inherited, ctypes.sizeof(inherited), None, None
+                )
+            )
+            checked(
+                kernel.UpdateProcThreadAttribute(
+                    attributes, 0, 0x2000D, jobs, ctypes.sizeof(jobs), None, None
+                )
+            )
+            startup = StartupInfoEx()
+            startup.startup.cb = ctypes.sizeof(startup)
+            startup.startup.dwFlags = 0x100
+            startup.startup.hStdInput, startup.startup.hStdOutput, startup.startup.hStdError = handles
+            startup.attributes = ctypes.cast(attributes, ctypes.c_void_p)
+            info = ProcessInfo()
+            checked(
+                kernel.CreateProcessW(
+                    argv[0],
+                    ctypes.create_unicode_buffer(command),
+                    None,
+                    None,
+                    True,
+                    0x08080404,
+                    environment,
+                    None,
+                    ctypes.byref(startup),
+                    ctypes.byref(info),
+                )
+            )
+            return ContainedProcess(self, job, info)
         except BaseException:
-            if resource_id is not None:
-                owned_resources.unconfirmed(resource_id)
+            job.Close()
+            if info is not None:
+                for handle in (info.thread, info.process):
+                    if handle:
+                        kernel.CloseHandle(handle)
             raise
         finally:
-            with ExitStack() as cleanup:
-                if resource_id is not None and job_closed:
-                    cleanup.callback(owned_resources.finished, resource_id)
-                if attributes_ready:
-                    cleanup.callback(delete, buffer)
-                for handle in handles:
-                    cleanup.callback(os.set_handle_inheritable, handle, False)
-                if info.thread:
-                    cleanup.callback(close, info.thread)
-                if info.process:
-                    cleanup.callback(close, info.process)
-                    wait(info.process, 5000)
+            for handle in handles:
+                os.set_handle_inheritable(handle, False)
+            if ready:
+                kernel.DeleteProcThreadAttributeList(attributes)
 
 
-def run_owned(args, *, timeout, check=False, encoding=None, errors="strict", resource_kind="worker"):
-    """Run trusted app argv with disconnected stdin and 64 KiB diagnostic tails.
+def inherited_tree(driver):
+    """Validate a temporary helper's membership in its exact durable parent tree.
 
-    Windows owns the full child job, including on abrupt parent exit. The POSIX
-    fallback cleans its process group on return/timeout; abrupt-parent cleanup
-    there is outside this Windows app's acceptance profile.
+    Helpers do not become replacement resource owners. The parent record plus the
+    actual named kernel job must both match before any nested converter starts.
     """
+    raw = os.environ.get(TREE_ENV)
+    if not raw:
+        return None
+    if len(raw) > 8192:
+        raise ValueError("Invalid inherited resource context")
+    context = json.loads(raw)
+    token = context.get("job_token", "")
+    if not re.fullmatch("[0-9a-f]{32}", token):
+        raise ValueError("Invalid inherited resource identity")
+    from universal_tools.resources import ResourceLedger
+
+    records = ResourceLedger(context["registry"], driver=driver).records()
+    matches = [
+        record
+        for record in records
+        if record.owner_id == context["owner_id"]
+        and record.owner.model_dump(mode="json") == context["owner"]
+        and record.label == context["label"]
+        and record.state == "active"
+        and record.ownership == "private"
+        and record.containment == "windows_job"
+    ]
+    if len(matches) != 1 or driver.state(context["owner"]) != "alive":
+        raise ValueError("Inherited supervisor resource is unavailable; no orphan adoption")
+    kernel = driver.kernel
+    kernel.OpenJobObjectW.argtypes, kernel.OpenJobObjectW.restype = [w.DWORD, w.BOOL, w.LPCWSTR], w.HANDLE
+    kernel.IsProcessInJob.argtypes = [w.HANDLE, w.HANDLE, ctypes.POINTER(w.BOOL)]
+    kernel.IsProcessInJob.restype = w.BOOL
+    job = checked(kernel.OpenJobObjectW(4, False, "Local\\AutoCADMCP-" + token))
+    try:
+        member = w.BOOL()
+        checked(kernel.IsProcessInJob(w.HANDLE(-1), job, ctypes.byref(member)))
+        if not member.value:
+            raise ValueError("Temporary helper is outside its recorded supervisor's containment")
+    finally:
+        kernel.CloseHandle(job)
+    return matches[0]
+
+
+def run_owned(
+    args,
+    *,
+    timeout,
+    check=False,
+    encoding=None,
+    errors="strict",
+    resource_kind="worker",
+    on_poll=None,
+    capture_limit=DIAGNOSTIC_BYTES,
+):
+    """Run trusted worker argv with durable ownership, bounded diagnostic tails and deadlines."""
     if not args or timeout <= 0:
         raise ValueError("An explicit worker command and positive deadline are required")
+    if type(capture_limit) is not int or not 1 <= capture_limit <= 2 * 1024 * 1024:
+        raise ValueError("Invalid private worker capture budget")
     args = [os.fspath(item) for item in args]
-    with open(os.devnull, "rb") as incoming, tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+    with Captures(capture_limit) as capture:
         try:
             if os.name == "nt":
-                returncode = _windows(args, timeout, (incoming, out, err), resource_kind)
+                driver = StreamProcessDriver()
+                parent_tree = inherited_tree(driver)
+                if parent_tree is None:
+                    launch = owned_resources.launch_worker(args, capture.streams, resource_kind)
+                    group = launch.group
+                    driver = group.driver
+                else:
+                    # The durable parent tree owns this nested converter and all
+                    # its descendants; no temporary registration helper becomes owner.
+                    launch = None
+                    group = driver.create_suspended(args, streams=capture.streams, max_processes=8)
+                    try:
+                        group.resume()
+                    except BaseException:
+                        group.close()
+                        raise
+                capture.close_parent_writers()
+                deadline, refresh = time.monotonic() + timeout, 0.0
+                try:
+                    while True:
+                        if on_poll:
+                            on_poll()
+                        state = driver.kernel.WaitForSingleObject(group.info.process, 100)
+                        if state == 0:
+                            break
+                        if state != 258:
+                            raise OSError("Owned worker wait failed")
+                        if time.monotonic() >= deadline:
+                            raise subprocess.TimeoutExpired(args, timeout)
+                        if launch and time.monotonic() >= refresh:
+                            launch.refresh()
+                            refresh = time.monotonic() + 1
+                    if on_poll:
+                        on_poll()
+                    code = w.DWORD()
+                    checked(driver.kernel.GetExitCodeProcess(group.info.process, ctypes.byref(code)))
+                    returncode = code.value
+                finally:
+                    if launch:
+                        launch.close()
+                    else:
+                        try:
+                            group.stop()
+                        finally:
+                            group.close()
             else:
                 process = subprocess.Popen(
-                    args, stdin=incoming, stdout=out, stderr=err, start_new_session=True
+                    args,
+                    stdin=capture.streams[0],
+                    stdout=capture.streams[1],
+                    stderr=capture.streams[2],
+                    start_new_session=True,
                 )
+                capture.close_parent_writers()
                 try:
                     returncode = process.wait(timeout=timeout)
                 finally:
@@ -247,11 +287,16 @@ def run_owned(args, *, timeout, check=False, encoding=None, errors="strict", res
                         pass
                     process.wait(timeout=5)
         except subprocess.TimeoutExpired as error:
-            error.output, error.stderr = _tail(out, encoding, errors), _tail(err, encoding, errors)
+            capture.finish()
+            error.output, error.stderr = (buffer.value(encoding, errors) for buffer in capture.buffers)
             raise
+        capture.finish()
         result = subprocess.CompletedProcess(
-            args, returncode, _tail(out, encoding, errors), _tail(err, encoding, errors)
+            args,
+            returncode,
+            *(buffer.value(encoding, errors) for buffer in capture.buffers),
         )
+        result.stdout_truncated, result.stderr_truncated = (buffer.truncated for buffer in capture.buffers)
         if check:
             result.check_returncode()
         return result

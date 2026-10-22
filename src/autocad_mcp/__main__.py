@@ -31,7 +31,7 @@ def main():
     serve.add_argument(
         "--workflow",
         action="store_true",
-        help="Run as an app-host backend without manager registration or job ownership",
+        help="Reserved app-host backend; deployment is blocked pending SDK stdio ownership",
     )
     prepare = sub.add_parser(
         "framework-prepare", help="Publish a private, immutable backend for the app-owned framework host"
@@ -88,6 +88,10 @@ def main():
     compare.add_argument("before_project_id")
     compare.add_argument("after_project_id")
     args = parser.parse_args()
+    if args.command == "serve" and args.workflow:
+        from .framework_host import RUNTIME_BLOCKER
+
+        parser.error(RUNTIME_BLOCKER)
     if args.command.startswith("framework-"):
         from pathlib import Path
 
@@ -122,10 +126,15 @@ def main():
         with server_lifetime(config, backend=args.workflow, stdio=args.transport == "stdio"):
             _serve(config, args)
         return
+    from .owned_resources import owned_resources
     from .service import DrawingService
 
-    service = DrawingService(config)
-    _execute(service, args)
+    owned_resources.configure()
+    try:
+        service = DrawingService(config)
+        _execute(service, args)
+    finally:
+        owned_resources.close()
 
 
 def _serve(config, args):
@@ -134,6 +143,7 @@ def _serve(config, args):
     from .server import create_server
     from .service import DrawingService
 
+    owned_resources.configure(args.management_registry)
     service = DrawingService(config)
     scheduler = RequestScheduler(service.config.max_concurrent_requests, service.config.max_queued_requests)
     server = create_server(service, args.port, workflow=args.workflow, scheduler=scheduler)
@@ -147,17 +157,18 @@ def _serve(config, args):
             return value
 
         reporting = Reporting(activity, registry=args.management_registry)
-    try:
-        with reporting:
+    with reporting:
+        try:
             if args.transport == "stdio":
                 server.run(transport="stdio")
             else:
                 server.run(transport="streamable-http", host="127.0.0.1", port=args.port)
-    finally:
-        try:
-            service.batch_jobs.close()
         finally:
-            owned_resources.close()
+            try:
+                service.batch_jobs.close(timeout=0)
+            finally:
+                owned_resources.close()
+                service.batch_jobs.close(timeout=2)
 
 
 def _execute(service, args):

@@ -7,6 +7,8 @@ versioned guide before dispatch. Describe each backend tool for its schema and c
 revision. Native cad_* tools remain available through the direct stdio endpoint.
 Read topic references with cad_get_workflow_reference using the guide's exact revision and
 SHA-256. cad_capabilities describes enabled profiles and their concrete blockers.
+Experimental framework host/proxy startup is blocked pending SDK stdio ownership integration;
+the standalone plugin retains its direct native tools. No automatic route switch is provided.
 Framework backend changes require explicit app-owned publication and refresh. Native skill,
 front-door schema, framework runtime or startup-instruction changes require plugin/host update
 and Codex reconnection. Chat approval-mode settings are not an app authorization mechanism;
@@ -57,8 +59,8 @@ they do not forward native resource/skill methods. Never switch routes automatic
 Inspect cad_concurrency_status when busy. Only call cad_highlight_source_object when the user
 requests highlighting in an unchanged source already open in full AutoCAD. Highlighting affects
 the display only, is serialized across app processes, and unknown outcomes need inspection.
-cad_status resource_ownership describes only this process's live owned worker handles. Durable
-resource recovery remains blocked pending the shared ledger integration. Never kill software by
+cad_status resource_ownership describes this supervisor's cached resource observations. Shared
+durable records support reviewed recovery; native/Codex acceptance remains separate. Never kill software by
 name or a stale PID, close an attached user-owned application or treat process exit as rollback.
 No controller, drawing-edit, deployment or automatic route-failover operations are provided.
 """

@@ -5,16 +5,19 @@ from __future__ import annotations
 import importlib.metadata
 import json
 import os
+import shutil
 import threading
+import time
 import tomllib
 from contextlib import contextmanager
 from pathlib import Path
 
 from universal_tools import __version__ as framework_version
 from universal_tools.management import ComponentVersion, ManagedService, ManagedStatus, RestartResult
-from universal_tools.manager_inventory import CodexInventory, newer_numeric_version
+from universal_tools.manager_inventory import CodexInventory, newer_numeric_version, parse_inventory
 
 from . import __version__
+from .owned_process import run_owned
 from .owned_resources import owned_resources
 
 PLUGIN_ID = "autocad@autocad-local"
@@ -22,6 +25,56 @@ RESTART_REASON = (
     "No surviving app supervisor or cross-chat quiescence fence; "
     "leases, queued work and unresolved drawing effects require operator reconciliation"
 )
+
+
+class OwnedCodexInventory(CodexInventory):
+    """Fixed metadata probes are owned trees, including the official npm Node shim."""
+
+    def __init__(self, *, command=None, interval=60):
+        super().__init__(
+            command=command or shutil.which("codex.exe") or shutil.which("codex"), interval=interval
+        )
+
+    def argv(self):
+        command = self.command
+        if not command:
+            raise ValueError("Codex CLI is unavailable")
+        executable = Path(command).resolve(strict=True)
+        if os.name != "nt" or executable.suffix.lower() == ".exe":
+            return [str(executable), "plugin", "list", "--json"]
+        script = executable.parent / "node_modules/@openai/codex/bin/codex.js"
+        adjacent = executable.parent / "node.exe"
+        node = str(adjacent) if adjacent.is_file() else shutil.which("node.exe")
+        if executable.name.lower() not in {"codex.cmd", "codex.bat"} or not script.is_file() or not node:
+            raise ValueError("No supported owned Codex metadata launcher")
+        return [
+            str(Path(node).resolve(strict=True)),
+            str(script.resolve(strict=True)),
+            "plugin",
+            "list",
+            "--json",
+        ]
+
+    def refresh(self, *, force=False):
+        now = time.monotonic()
+        if not force and self.checked_at and now - self.checked_at < self.interval:
+            return self.rows, self.error
+        self.checked_at = now
+        try:
+            result = run_owned(
+                self.argv(),
+                timeout=15,
+                check=True,
+                resource_kind="codex-inventory",
+                capture_limit=2 * 1024 * 1024,
+            )
+            if getattr(result, "stdout_truncated", False):
+                raise ValueError("Codex inventory exceeds its private capture budget")
+            self.rows = parse_inventory(json.loads(result.stdout))
+            self.error = None
+        except Exception:
+            self.error = "Plugin inventory is unavailable; previously observed versions may be stale"
+        return self.rows, self.error
 
 
 class Activity:
@@ -57,7 +110,7 @@ class Reporting:
     def __init__(self, activity, *, registry=None, publisher=None, inventory=None, interval=30):
         self.activity = activity
         self.publisher = Path(publisher) if publisher else Path(__file__).resolve().parents[2]
-        self.inventory = inventory if inventory is not None else CodexInventory()
+        self.inventory = inventory if inventory is not None else OwnedCodexInventory()
         self.interval = interval
         self.guard = threading.Lock()
         self.versions = {}
@@ -134,7 +187,7 @@ class Reporting:
         return ManagedStatus(
             state="busy" if active else ("degraded" if warning else "running"),
             message=(warning or "Drawing service process; no drawings opened for status")
-            + f"; owned worker trees: {resources['active_count']}; attached apps are preserved",
+            + f"; owned worker trees: {resources['owned_tree_count']}; protected attachments: {resources['attached_count']}",
             active_operations=active,
             versions=versions,
             restart_allowed=False,
@@ -153,9 +206,14 @@ class Reporting:
                 break
 
     def __enter__(self):
-        self.agent.start()
-        self.thread = threading.Thread(target=self._refresh, name="autocad-versions", daemon=True)
-        self.thread.start()
+        try:
+            self.agent.start()
+            self.thread = threading.Thread(target=self._refresh, name="autocad-versions", daemon=True)
+            self.thread.start()
+        except BaseException:
+            self.stop.set()
+            self.agent.close()
+            raise
         return self
 
     def __exit__(self, *_):

@@ -16,7 +16,7 @@ Selection is saved under ignored `.local/codex-integration.json`. Ordinary `--st
 
 The default native stdio endpoint exposes the 31 `cad_*` tools and starts its own app process. Use `cad_status` and the app's initialization guidance to select explicit drawing/project IDs.
 
-The optional app-owned framework frontend connects to AutoCAD's already-running authenticated host. It exposes fourteen fixed discovery/invocation tools, with versioned drawing backends and a read-only current workflow guide. This is part of the standalone application. See [framework setup and lifecycle](shared-app-framework.md). Shared framework code remains a pinned package dependency; it does not register AutoCAD with an external service.
+The experimental framework frontend is source-assessment code with fourteen fixed tools and versioned drawing backends. Host/proxy CLI startup is blocked until SDK stdio ownership integration; no route switch occurs. See [framework lifecycle](shared-app-framework.md) and [resource coverage](resource-ownership.md). Shared framework code remains a pinned Python dependency, without an external registration or universal Codex connection.
 
 `python scripts/install_plugin.py --prepare-only` generates private bindings without registering them. `--frontend framework --host-state PATH` explicitly prepares the app-owned frontend; native stdio remains the default. Generated bindings live under ignored `.local/codex-marketplace/`. Reload the plugin connection or use a new chat after native package updates.
 

@@ -7,17 +7,23 @@ def report(backend=False):
     return {
         "app_id": "autocad",
         "version": __version__,
-        "framework": "0.18.0",
+        "framework": "0.20.0",
         "sdk": "2.3.0",
         "selected_surface": "drawing-engine backend" if backend else "direct native server",
         "features": {
             "process_lifetimes": {
-                "state": "implemented_unassessed",
-                "boundary": "Fail-fast per-state server leases, captured-parent/stdio EOF fences and Windows job-owned workers. Windows runtime shutdown/descendant acceptance is pending; no restart supervisor or native rollback claim.",
+                "state": "implemented",
+                "evidence": "Harmless Windows timeout, owner-death, nested-helper, protected-attachment and EOF-fence fixtures passed",
+                "boundary": "Native MCP server, Codex activation and AutoCAD cleanup acceptance remain unassessed; no restart supervisor or native rollback claim.",
             },
             "durable_resource_recovery": {
+                "state": "implemented",
+                "evidence": "Shared 0.20 ResourceLedger/ResourceOwner; durable binding before resume, exact creation identities, cleanup receipts and reviewed harmless orphan recovery",
+                "boundary": "No automatic cleanup/retry, shared native launch, live-registration migration or installed-manager acceptance. Native attachments stay report-only.",
+            },
+            "framework_stdio_ownership": {
                 "state": "blocked",
-                "reason": "Live exclusive-resource registry exists; shared-package durable ledger/API is pending. No restart/shared-manager recovery claim and no cleanup by PID/name guessing.",
+                "reason": "SDK backend stdio creation has no integrated app-owned launch/containment hook. Experimental host/proxy CLI startup is disabled; the background launcher is not an MCP stdio transport.",
             },
             "workflow_readers": {
                 "state": "enabled",

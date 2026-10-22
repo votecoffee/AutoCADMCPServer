@@ -17,7 +17,12 @@ from .config import Config, inside
 from .coordination import Coordinator
 from .integration import HIGHLIGHT, OFFLINE_WRITES
 
-FRAMEWORK_VERSION = "0.18.0"
+FRAMEWORK_VERSION = "0.20.0"
+SDK_STDIO_OWNERSHIP_SUPPORTED = False
+RUNTIME_BLOCKER = (
+    "Experimental framework host/proxy startup is blocked pending app-owned SDK stdio resource ownership; "
+    "the background worker launcher cannot replace MCP transport. No automatic route switch."
+)
 HOST_INSTRUCTIONS = (
     "AutoCAD MCP Server app-owned framework host. Use search_tools, then describe_service and "
     "describe_tool for drawing-engine/cad_get_workflow. Read that tool's current app workflow "
@@ -290,6 +295,12 @@ def create_host(state: Path, publication: Path, config_path: Path, **kwargs):
 
 
 def serve(state: Path, publication: Path, config_path: Path, *, registry=None):
+    if not SDK_STDIO_OWNERSHIP_SUPPORTED:
+        raise ValueError(RUNTIME_BLOCKER)
+    return _serve_owned_pilot(state, publication, config_path, registry=registry)
+
+
+def _serve_owned_pilot(state: Path, publication: Path, config_path: Path, *, registry=None):
     from .lifetime import server_lifetime
 
     config = Config.load(config_path)
@@ -337,6 +348,12 @@ def _serve(state: Path, publication: Path, config_path: Path, *, registry=None):
 
 
 def proxy(state: Path):
+    if not SDK_STDIO_OWNERSHIP_SUPPORTED:
+        raise ValueError(RUNTIME_BLOCKER)
+    return _proxy_owned_pilot(state)
+
+
+def _proxy_owned_pilot(state: Path):
     from .lifetime import parent_lifetime
 
     state = state.resolve(strict=True)

@@ -6,6 +6,7 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 
+from autocad_mcp import autocad
 from autocad_mcp.autocad import highlight, highlight_document, run_worker
 
 
@@ -89,7 +90,10 @@ def test_display_failure_after_highlight_is_unknown_and_does_not_claim_rollback(
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows-only attachment policy with stubbed COM APIs")
 @pytest.mark.parametrize("dirty", [False, True])
-def test_worker_releases_attachment_without_closing_or_saving_user_app(tmp_path, monkeypatch, dirty):
+@pytest.mark.parametrize("registration_matches", [False, True])
+def test_worker_releases_attachment_without_closing_or_saving_user_app(
+    tmp_path, monkeypatch, dirty, registration_matches
+):
     path = tmp_path / "drawing.dwg"
     path.write_bytes(b"Synthetic drawing hash fixture; no CAD runtime")
     doc = Document(path)
@@ -97,13 +101,16 @@ def test_worker_releases_attachment_without_closing_or_saving_user_app(tmp_path,
     effects = []
     doc.Close = lambda *args: effects.append("Close")
     doc.Save = lambda *args: effects.append("Save")
-    application = SimpleNamespace(Documents=[doc], Quit=lambda: effects.append("Quit"))
+    application = SimpleNamespace(Documents=[doc], HWND=1, Quit=lambda: effects.append("Quit"))
     client = ModuleType("win32com.client")
     client.GetActiveObject = lambda name: application
     package = ModuleType("win32com")
     package.client = client
     monkeypatch.setitem(sys.modules, "win32com", package)
     monkeypatch.setitem(sys.modules, "win32com.client", client)
+    monkeypatch.setitem(
+        sys.modules, "win32process", SimpleNamespace(GetWindowThreadProcessId=lambda window: (1, 1234))
+    )
     monkeypatch.setitem(
         sys.modules,
         "pythoncom",
@@ -113,6 +120,18 @@ def test_worker_releases_attachment_without_closing_or_saving_user_app(tmp_path,
         ),
     )
     request, response = tmp_path / "request.json", tmp_path / "response.json"
+    attachment_request, attachment_registered = tmp_path / "attachment.json", tmp_path / "registered.json"
+    identity = {"host_id": "a" * 64, "pid": 1234, "created": "500", "executable": "C:\\fixture\\acad.exe"}
+    monkeypatch.setattr(autocad, "ProcessDriver", lambda: SimpleNamespace(capture=lambda pid: identity))
+    attachment_registered.write_text(
+        json.dumps(
+            {
+                "pid": 1234,
+                "token": "fixture",
+                "process": identity if registration_matches else {**identity, "created": "501"},
+            }
+        )
+    )
     request.write_text(
         json.dumps(
             {
@@ -121,13 +140,19 @@ def test_worker_releases_attachment_without_closing_or_saving_user_app(tmp_path,
                 "handle": "AB",
                 "enabled": True,
                 "expected_type": "INSERT",
+                "attachment_request": str(attachment_request),
+                "attachment_registered": str(attachment_registered),
+                "attachment_token": "fixture",
             }
         )
     )
     run_worker(request, response)
     result = json.loads(response.read_bytes())
-    assert result["status"] == ("failed" if dirty else "COM_call_completed")
+    assert result["status"] == ("failed" if dirty or not registration_matches else "COM_call_completed")
     assert result["resource_ownership"]["application"] == "attached_user_owned"
     assert not result["resource_ownership"]["application_close_requested"]
     assert effects == ["CoInitialize", "CoUninitialize"]
+    assert json.loads(attachment_request.read_bytes()) == {"pid": 1234, "token": "fixture"}
     assert doc.modified == int(dirty)
+    if not registration_matches:
+        assert not doc.activated

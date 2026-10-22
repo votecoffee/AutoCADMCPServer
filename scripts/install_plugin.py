@@ -120,6 +120,10 @@ def main():
     parser.add_argument("--frontend", choices=["legacy", "framework"], default="legacy")
     parser.add_argument("--host-state", type=Path, help="Dedicated app-owned framework host state")
     args = parser.parse_args()
+    if args.frontend == "framework" and not args.prepare_only and args.mode != "none":
+        parser.error(
+            "Framework plugin deployment is blocked pending app-owned SDK stdio resource ownership; --prepare-only remains available"
+        )
     repo = Path(__file__).resolve().parents[1]
     config = (args.config or repo / ".local/config.json").resolve(strict=True)
     from autocad_mcp.electrical import atomic_json

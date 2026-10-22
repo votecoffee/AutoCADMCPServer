@@ -26,6 +26,7 @@ class Config:
     max_worker_processes: int = 4
     max_oda_processes: int = 1
     max_server_instances: int = 2
+    max_index_jobs: int = 8
     lock_timeout_seconds: int = 180
 
     @classmethod
@@ -54,6 +55,7 @@ class Config:
             ("max_worker_processes", 4, 1, 16),
             ("max_oda_processes", 1, 1, 4),
             ("max_server_instances", 2, 1, 8),
+            ("max_index_jobs", 8, 1, 32),
             ("lock_timeout_seconds", 180, 1, 600),
         ):
             value = raw.get(key, default)

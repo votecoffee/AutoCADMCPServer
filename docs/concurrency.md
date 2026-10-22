@@ -13,10 +13,11 @@ Version 0.3 runs blocking MCP operations in a bounded thread pool. HTTP sessions
 | Control calls | 2 active, 8 admitted | Separate per-process capacity for status and transaction lookup |
 | Child workers | 4 | Shared by all processes using one state directory |
 | ODA conversions | 1 | Shared by state directory; other worker slots remain available |
+| Index-job intents | 8 | Active, queued and unknown jobs share a per-state budget; unknown outcomes retain admission |
 | AutoCAD UI operations | 1 | Serialized across processes using the state directory |
 | Resource wait | 180 seconds | Configurable, distinct from a worker's execution timeout |
 
-Configure `max_concurrent_requests`, `max_queued_requests`, `max_worker_processes`, `max_oda_processes`, `max_server_instances` and `lock_timeout_seconds` in the private configuration. Keep settings consistent across all processes sharing a state directory, and restart them when changing limits. Only processes using this server and state directory participate; external AutoCAD automation is outside these locks. See [process lifetimes](service-management.md#process-lifetimes-and-shutdown) for the source implementation, live ownership registry and pending operational/durable-recovery acceptance.
+Configure `max_concurrent_requests`, `max_queued_requests`, `max_worker_processes`, `max_oda_processes`, `max_server_instances`, `max_index_jobs` and `lock_timeout_seconds` in private configuration. Keep settings consistent across processes sharing a state directory, and restart them when changing limits. Only this server/state participates; external AutoCAD automation is outside these locks. See [resource lifetimes](resource-ownership.md) for durable shared ownership, permitted fixture evidence and pending MCP/native acceptance.
 
 `cad_concurrency_status` reports active/queued counts for the answering MCP process and shared worker limits. It does not claim to count all requests in other chats. `cad_status` reports configured concurrency settings. Control calls use separate admission capacity so extraction saturation does not put them behind the normal work queue.
 

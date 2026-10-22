@@ -4,7 +4,7 @@
 
 Source-preserving local DWG, DXF, PDF and AutoCAD Electrical information extraction for MCP
 
-Extract drawing information through a shared Python service, command line interface and Model Context Protocol server. Device and PLC I/O inventories, connection tracing, equipment grouping, documented network inventory, consistency checks, revision comparison and JSON exports retain source evidence. Version 0.4 adds an experimental app-owned shared-framework host with stable discovery/invocation schemas and versioned backend publications, while retaining the independent standalone plugin and legacy native endpoint. Native report assertions, observed attributes and interpretation stay distinct. Sources are preserved; optional guarded highlighting affects an unchanged drawing already open in AutoCAD. The repository is named `AutoCADMCPServer`; the Python distribution is `autocad-mcp-server`.
+Extract drawing information through a shared Python service, command line interface and Model Context Protocol server. Device and PLC I/O inventories, connection tracing, equipment grouping, documented network inventory, consistency checks, revision comparison and JSON exports retain source evidence. Version 0.6 adds current guidance, bounded index jobs/artifacts and durable ownership of private worker trees while retaining AutoCAD's independent plugin and native endpoint. Experimental app-host deployment is blocked pending its SDK stdio ownership adapter. Native report assertions, observed attributes and interpretation stay distinct. Sources are preserved; optional guarded highlighting affects an unchanged drawing already open in AutoCAD. The repository is named `AutoCADMCPServer`; the Python distribution is `autocad-mcp-server`.
 
 ## Table of Contents
 
@@ -36,7 +36,7 @@ DWG conversion uses an independently installed ODA File Converter. DXF parsing u
 ### Dependencies
 
 - [Python](https://www.python.org/downloads/) 3.11 or later. The PowerShell examples use Python 3.13.
-- The verified local `universal-codex-tools==0.18.0` framework wheel built from the [pushed framework baseline](https://github.com/votecoffee/CodexMCPBroker/commit/7d8a0ccdc06598313061147ee8774837118a8861). It is a normal pinned Python dependency; no public package feed is shipped yet. MCP is pinned at **2.3.0**; setup rejects an older framework SDK pin instead of downgrading the app. See [framework dependency and verification](docs/shared-app-framework.md#dependency-and-packaging).
+- The verified local `universal-codex-tools==0.20.0` framework wheel built from the [pushed framework baseline](https://github.com/votecoffee/CodexMCPBroker/commit/5b2cac50ca24d21a15b732e0424bb02fd794e1fb). It is a normal pinned Python dependency; no public package feed is shipped yet. MCP is pinned at **2.3.0**; setup rejects an older framework SDK pin instead of downgrading the app. See [framework dependency and verification](docs/shared-app-framework.md#dependency-and-packaging).
 - [ODA File Converter](https://www.opendesign.com/guestfiles/oda_file_converter), installed separately, for DWG extraction. Windows installations are detected under `C:/Program Files/ODA`; an absolute executable path can also be configured. DXF and PDF extraction do not need ODA.
 
 Optional source highlighting requires full AutoCAD running on Windows and pywin32, included explicitly in the Windows runtime lock. TrueView and ODA do not provide the live operation.
@@ -48,7 +48,7 @@ From a checkout on Windows:
 For Windows setup and a foreground compatibility server, run `InstallAndRun.cmd` in the project root. On the first 0.4 setup, supply `--framework-wheel PATH`; the verified wheel is cached privately for subsequent installs. Setup creates or reuses this checkout's `.venv`, installs hash-locked dependencies and the application, preserves existing configuration, and starts legacy loopback MCP HTTP at `http://127.0.0.1:8796/mcp`. On first setup it prompts for a drawing folder. Python 3.11 or newer is required; `uv` is used when available, with pip as the fallback. ODA is installed separately. Framework source alignment does not automatically select its new host for an installed workflow.
 
 ```powershell
-.\InstallAndRun.cmd --framework-wheel 'C:\Packages\universal_codex_tools-0.18.0-py3-none-any.whl' --install-only
+.\InstallAndRun.cmd --framework-wheel 'C:\Packages\universal_codex_tools-0.20.0-py3-none-any.whl' --install-only
 .\InstallAndRun.cmd
 .\InstallAndRun.cmd --install-only
 .\InstallAndRun.cmd --port 8797
@@ -77,7 +77,7 @@ Repeat `--root name=directory` to configure multiple projects. Configuration, ca
 
 ## Usage
 
-Server instances and worker descendants have explicit ownership limits. See [process lifetimes and shutdown](docs/service-management.md#process-lifetimes-and-shutdown) for the source implementation and remaining Windows acceptance checks. A service restart remains disabled.
+Server instances and worker descendants have explicit ownership limits and shared 0.20 durable records. See [resource ownership and launch coverage](docs/resource-ownership.md) for tested harmless fixtures, protected native attachments and remaining MCP/native acceptance checks. A service restart remains disabled.
 
 ### CLI
 
@@ -127,7 +127,7 @@ Python clients use `ElectricalService(service).build("drawings", ...)` from `aut
 
 ### Shared app framework
 
-The shared-code path uses `universal_tools.framework.ApplicationHost` from the pinned framework 0.18.0. Its fourteen stable tools discover versioned `drawing-engine` backends. All 31 original operations remain, with current guide/reference readers, a capability report, direct-owner index job controls and bounded artifact reads: 38 definitions in total. Default host publication stays transient/legacy; a retained-modern pilot requires explicit separate host state. Source checks, app authorization and durable receipts remain authoritative.
+The shared-code prototype uses `universal_tools.framework.ApplicationHost` from pinned framework 0.20.0. Its fourteen stable tools discover versioned `drawing-engine` backends. **Host/proxy CLI deployment is blocked** until SDK stdio processes have app-owned resource tracking and containment; preparation/source assessment does not activate it. The standalone native server retains all 31 original operations plus guide/reference readers, a capability report, direct-owner index jobs and bounded artifact reads: 38 definitions. Source checks, app authorization and durable receipts remain authoritative.
 
 Explicit isolated setup uses `framework-prepare`, `framework-serve` and `framework-proxy`. Published app code and nested extraction/render/table/highlight workers remain bound to immutable app snapshots. Original handlers, target/hash checks and app receipts remain authoritative. Backend feature/guide updates can refresh without changing the native front door; native skill/schema changes still require plugin update and Codex reload. Framework calls to one transient backend are serialized and add material startup latency. Actual Codex/native acceptance and recovery/admin UX remain separate work.
 

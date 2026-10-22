@@ -1,10 +1,12 @@
-"""Win32 launch-order and cleanup fixtures using only stub functions/handles."""
+"""Durable Win32 launch-order fixtures using only stub functions/handles."""
 
 import ctypes
+import os
 import sys
 from types import SimpleNamespace
 
 import pytest
+from universal_tools.resources import ResourceLedger
 
 from autocad_mcp import owned_process
 from autocad_mcp.owned_resources import OwnedResources
@@ -18,10 +20,40 @@ class Function:
         return self.callback(*args)
 
 
-@pytest.mark.parametrize("failure", [None, "job_attribute", "creation", "identity", "resume"])
-def test_windows_binds_job_and_creation_identity_before_resume_and_cleans_failures(monkeypatch, failure):
-    resources, events = OwnedResources(), []
-    monkeypatch.setattr(owned_process, "owned_resources", resources)
+@pytest.mark.parametrize("exited", [False, True])
+def test_identity_query_race_ignores_only_proven_exit_on_retained_handle(exited):
+    class Handle:
+        checks = 0
+
+        def alive(self):
+            self.checks += 1
+            return self.checks == 1 or not exited
+
+        @property
+        def identity(self):
+            raise PermissionError("Synthetic image query race")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    driver = owned_process.StreamProcessDriver.__new__(owned_process.StreamProcessDriver)
+    driver._open = lambda pid: Handle()
+    with pytest.raises(ProcessLookupError if exited else PermissionError):
+        driver.capture(1234)
+
+
+@pytest.mark.parametrize("failure", [None, "job_attribute", "creation", "identity", "binding", "resume"])
+def test_durable_identity_precedes_resume_and_startup_failures_close_job(tmp_path, monkeypatch, failure):
+    events, alive = [], {"worker": True}
+    pid = 7654321
+    identity = {"host_id": "a" * 64, "pid": pid, "created": "2000", "executable": sys.executable}
+    driver = owned_process.StreamProcessDriver.__new__(owned_process.StreamProcessDriver)
+    driver.host_id = "a" * 64
+    ledger = ResourceLedger(tmp_path, driver=driver)
+    resources = OwnedResources(ledger=ledger)
 
     class Job:
         def __int__(self):
@@ -29,23 +61,37 @@ def test_windows_binds_job_and_creation_identity_before_resume_and_cleans_failur
 
         def Close(self):
             events.append("job_close")
+            alive["worker"] = False
 
     job = Job()
+
+    def query(job, kind):
+        return {"BasicLimitInformation": {}} if kind == 9 else {"ActiveProcesses": int(alive["worker"])}
+
+    def terminate(job, code):
+        events.append("stop_tree")
+        alive["worker"] = False
+
     monkeypatch.setitem(
         sys.modules,
         "win32job",
         SimpleNamespace(
             CreateJobObject=lambda *args: job,
-            QueryInformationJobObject=lambda *args: {"BasicLimitInformation": {}},
+            QueryInformationJobObject=query,
             SetInformationJobObject=lambda *args: events.append("set_limits"),
+            TerminateJobObject=terminate,
             JobObjectExtendedLimitInformation=9,
+            JobObjectBasicAccountingInformation=1,
             JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE=0x2000,
             JOB_OBJECT_LIMIT_ACTIVE_PROCESS=8,
         ),
     )
-    monkeypatch.setitem(
-        sys.modules, "msvcrt", SimpleNamespace(get_osfhandle=lambda descriptor: descriptor + 100)
-    )
+    import msvcrt
+
+    import win32api
+
+    monkeypatch.setattr(win32api, "GetLastError", lambda: 0)
+    monkeypatch.setattr(msvcrt, "get_osfhandle", lambda fd: fd + 100)
     monkeypatch.setattr(
         owned_process.os,
         "set_handle_inheritable",
@@ -59,7 +105,7 @@ def test_windows_binds_job_and_creation_identity_before_resume_and_cleans_failur
     def update(buffer, flags, attribute, value, size, previous, returned):
         if attribute == 0x2000D:
             if failure == "job_attribute":
-                raise OSError("Synthetic ownership assignment rejection")
+                raise OSError("Synthetic job rejection")
             assert list(value) == [555]
             events.append("job_bound")
         else:
@@ -67,33 +113,41 @@ def test_windows_binds_job_and_creation_identity_before_resume_and_cleans_failur
             events.append("only_explicit_handles")
         return True
 
-    def create(application, command, process_sa, thread_sa, inherit, flags, env, cwd, startup, info):
+    def create(application, command, psa, tsa, inherit, flags, env, cwd, startup, info):
         assert "job_bound" in events and "only_explicit_handles" in events
-        assert flags == 0x08080004 and inherit
-        assert startup._obj.startup.cb == ctypes.sizeof(owned_process._StartupEx)
-        assert resources.snapshot()["active"][0]["state"] == "starting"
+        assert flags == 0x08080404 and inherit
+        assert startup._obj.startup.cb == ctypes.sizeof(owned_process.StartupInfoEx)
+        assert ledger.records()[0].state == "launching"
         if failure == "creation":
             raise OSError("Synthetic creation failure")
-        info._obj.process, info._obj.thread, info._obj.pid = 700, 701, 1234
+        info._obj.process, info._obj.thread, info._obj.pid = 700, 701, pid
         events.append("created_suspended")
         return True
 
-    def times(process, creation, exited, kernel, user):
-        assert "created_suspended" in events
+    def capture_handle(handle, observed_pid):
         if failure == "identity":
-            raise OSError("Synthetic creation-time failure")
-        creation._obj.dwHighDateTime, creation._obj.dwLowDateTime = 1, 2
-        return True
+            raise OSError("Synthetic identity failure")
+        return identity
+
+    def capture(observed_pid):
+        if observed_pid == os.getpid():
+            return {**identity, "pid": observed_pid, "created": "1000"}
+        if failure == "binding":
+            raise OSError("Synthetic durable binding failure")
+        return identity
 
     def resume(thread):
-        record = resources.snapshot()["active"][0]
-        assert record["state"] == "bound_suspended"
-        assert record["pid"] == 1234 and record["creation_identity"] == 4294967298
+        record = ledger.records()[0]
+        assert record.state == "active" and record.process.created == "2000"
+        assert record.owner.pid == os.getpid() and record.process.pid == pid
         events.append("resume")
-        return 2 if failure == "resume" else 1
+        if failure == "resume":
+            raise OSError("Synthetic resume failure")
+        return 1
 
-    def exit_code(process, output):
-        output._obj.value = 7
+    def members(job, kind, output, length, returned):
+        output._obj.count = int(alive["worker"])
+        output._obj.pids[0] = pid
         return True
 
     kernel = SimpleNamespace(
@@ -104,26 +158,39 @@ def test_windows_binds_job_and_creation_identity_before_resume_and_cleans_failur
                 "UpdateProcThreadAttribute": update,
                 "DeleteProcThreadAttributeList": lambda *args: events.append("attributes_deleted"),
                 "CreateProcessW": create,
-                "GetProcessTimes": times,
                 "ResumeThread": resume,
-                "WaitForSingleObject": lambda *args: 0,
-                "GetExitCodeProcess": exit_code,
+                "QueryInformationJobObject": members,
                 "CloseHandle": lambda handle: events.append(("handle_closed", handle)),
             }.items()
         }
     )
-    monkeypatch.setattr(owned_process.ctypes, "WinDLL", lambda *args, **kwargs: kernel, raising=False)
-    streams = [SimpleNamespace(fileno=lambda index=index: index) for index in (10, 11, 12)]
+    driver.kernel = kernel
+    driver.capture_handle, driver.capture = capture_handle, capture
+    driver.state = lambda value: "alive" if value["pid"] == os.getpid() or alive["worker"] else "absent"
+
+    class Handle:
+        def terminate(self):
+            pytest.fail("A job resource must use owned-tree cleanup")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    driver.open = lambda value: Handle()
+    streams = [SimpleNamespace(fileno=lambda fd=fd: fd) for fd in (10, 11, 12)]
     if failure:
-        with pytest.raises((OSError, RuntimeError)):
-            owned_process._windows(["trusted-worker.exe"], 10, streams, "test-worker")
+        with pytest.raises(OSError):
+            resources.launch_worker([sys.executable], streams, "stub-worker")
+        assert ledger.records()[0].state == "failed"
+        assert "resume" not in events or failure == "resume"
     else:
-        assert owned_process._windows(["trusted-worker.exe"], 10, streams, "test-worker") == 7
+        launch = resources.launch_worker([sys.executable], streams, "stub-worker")
         assert events.index("job_bound") < events.index("created_suspended") < events.index("resume")
-    assert events.count("job_close") == 1
-    assert "attributes_deleted" in events
-    assert resources.snapshot()["active_count"] == 0
-    if failure in {"job_attribute", "creation", "identity"}:
-        assert "resume" not in events
+        assert launch.close()["outcome"] == "terminated"
+        assert ledger.records()[0].receipt.outcome == "terminated"
+        assert not ledger.plan(ledger.records()[0].resource_id)["eligible"]
+    assert events.count("job_close") == 1 and "attributes_deleted" in events
     if failure not in {"job_attribute", "creation"}:
         assert ("handle_closed", 700) in events and ("handle_closed", 701) in events

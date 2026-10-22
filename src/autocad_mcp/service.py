@@ -138,6 +138,7 @@ class DrawingService:
                 "max_worker_processes_per_state": self.config.max_worker_processes,
                 "max_oda_processes_per_state": self.config.max_oda_processes,
                 "max_server_instances_per_role": self.config.max_server_instances,
+                "max_index_jobs_per_state": self.config.max_index_jobs,
                 "lock_timeout_seconds": self.config.lock_timeout_seconds,
                 "coordination": "Cross-process cache/index/AutoCAD locks; WAL index transactions; atomic snapshots/exports",
             },

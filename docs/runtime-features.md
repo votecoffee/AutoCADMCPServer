@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | Current guide and references | Enabled; canonical revision/hash-pinned tool and native skill views | Native metadata changes require installation; running workers use explicit publication/refresh |
 | Native modern discovery caching | Enabled; two-second private tools/resource listing hints; independent SDK caches and event invalidation tested | Legacy clients get no hints; missing hints disable caching; no app results/effects are cached by this choice |
-| Retained modern host | Explicit opt-in, synthetic same-result and warm-latency comparison | Dedicated host state; not selected by setup; real host/native acceptance remains unassessed |
+| Retained modern host | Source prototype; earlier synthetic comparison retained | CLI deployment blocked until SDK stdio ownership integration; earlier protocol evidence does not clear this lifecycle gap |
 | Progress | Enabled for synchronous indexing and job polling; monotonic files-examined units | No fabricated percentages; disconnected progress recipients do not stop or roll back work |
 | Cooperative cancellation | Enabled for direct-owner index jobs; queued versus in-flight behavior and independent effects tested | A running converter finishes/fails under its existing deadline before cancellation can stop the next file |
 | App-owned index jobs | Enabled on a long-lived direct service; durable intent, request receipt deduplication, capability access and owner-loss barriers | Worker threads are not portable or supervised; keep the owner alive; abandoned ownership becomes unknown |
@@ -14,10 +14,13 @@
 | Approval continuations | Outside current offline workflow | No new approval prompts for metadata/state-only work; highlighting retains the user's request and native source preflight |
 | Preview/export resources | Enabled; completed receipt, root scope, hash and bounded byte reads tested | Same-user app-state scope, not per-chat confidentiality; native fixed proxies use the ordinary reader |
 | Service management | Enabled, cached status and versions | Restart disabled; no surviving supervisor/cross-chat quiescence fence |
-| Process lifetimes | Implemented, operationally unassessed; bounded instance leases, Windows owned descendants and parent/EOF fences | Windows synthetic shutdown/owner-loss checks must pass before deployment; no native rollback or detached supervisor claim |
+| Process lifetimes | Implemented; pure/stub and harmless Windows process fixtures | MCP/installed/native acceptance remains pending; no native rollback or detached supervisor claim |
+| Durable resource recovery | Shared 0.20 ledger, exact identities, cleanup receipts and protected attachments | Reviewed harmless orphan recovery tested; no automatic cleanup, live-registry migration or installed-manager acceptance |
 | Redis, remote OAuth, MCP Apps | Deferred | No deployment requirement or native/UI acceptance is implied by the dependency |
 
 ## Retained modern pilot
+
+The following is source preparation only. Host/proxy startup currently refuses before any server or transport starts because the SDK stdio ownership hook is not integrated. No alternate route is selected automatically.
 
 The default remains `transient-legacy` with catalog watching and discovery caching disabled. A separately selected host may use:
 
@@ -35,7 +38,7 @@ Tests record exact local samples as private JUnit properties. The discovery test
 
 `cad_start_index_job(root_id, offset, limit, request_id=...)` accepts 1..5 files. The app receipt confirms submission; the job's state confirms execution. Save its private `job_id`/`access_token`, poll `cad_get_index_job` and use `cad_cancel_index_job` for an explicit stop request. Tokens are checked against the job's configured-root/parser scope. A token is an app capability, not an authenticated MCP principal or approval.
 
-Intent is committed before dispatch, including the exact selected paths and source hashes. Added files cannot shift a queued batch; changed inputs fail before replacing that file's index. Duplicate start request IDs return the original job; changed arguments are rejected. Queued cancellation prevents dispatch. Running cancellation is requested and takes effect between files. Completed, cancelled and unknown are terminal execution observations; a request cancellation or disconnect does not prove rollback or native stop. Each file commits independently. Failures remain in the result. Capacity follows the configured active/queued limits, with unknown jobs retaining reservations until inspected. A lost owner is marked unknown without redispatch, including after process loss. Active/unknown jobs block backend publication. Operator reconciliation/archival must preserve original operation IDs and uncertainty; no model-facing clear/retry override exists.
+Intent is committed before dispatch, including exact selected paths and source hashes. Added files cannot shift a queued batch; changed inputs fail before replacing that file's index. Duplicate start request IDs return the original job; changed arguments are rejected. Queued cancellation prevents dispatch. Running cancellation is requested and takes effect between files. Completed, cancelled and unknown are terminal execution observations; a request cancellation or disconnect does not prove rollback or native stop. Each file commits independently. Failures remain in the result. `max_index_jobs` defaults to eight and accepts 1..32, additionally bounded by configured request capacity; unknown jobs retain reservations until inspected. A lost owner is marked unknown without redispatch, including after process loss. Active/unknown jobs block backend publication. Operator reconciliation/archival must preserve original IDs and uncertainty; no model-facing clear/retry override exists.
 
 Transient backend processes cannot promise job survival, so app-host job start is rejected and job mutation tools are absent from its write allowlist. Direct services must remain alive; their worker threads have no surviving supervisor. Ordinary status/results remain available when notification support is absent. No Tasks extension is advertised until ownership and supervision can meet that separate contract.
 

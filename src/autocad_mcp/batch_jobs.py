@@ -91,11 +91,11 @@ class BatchJobs:
         try:
             with self.connect() as db:
                 db.execute("BEGIN IMMEDIATE")
-                if (
-                    db.execute(
-                        "SELECT count(*) FROM jobs WHERE state IN ('queued','running','cancel_requested','unknown')"
-                    ).fetchone()[0]
-                    >= self.service.config.max_concurrent_requests + self.service.config.max_queued_requests
+                if db.execute(
+                    "SELECT count(*) FROM jobs WHERE state IN ('queued','running','cancel_requested','unknown')"
+                ).fetchone()[0] >= min(
+                    self.service.config.max_index_jobs,
+                    self.service.config.max_concurrent_requests + self.service.config.max_queued_requests,
                 ):
                     raise ResourceBusy("Index job capacity or unresolved outcomes require inspection")
                 db.execute(
