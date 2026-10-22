@@ -1,6 +1,6 @@
 # Shared app framework integration
 
-Version 0.6 pins `universal-codex-tools==0.20.0` at commit `5b2cac50ca24d21a15b732e0424bb02fd794e1fb`, retaining **MCP Python SDK 2.3.0**. Shared code now supplies durable resource ownership to the direct server. AutoCAD keeps its independent application, CLI, native endpoint, plugin and skills. The experimental `ApplicationHost` remains a source prototype: **host/proxy CLI deployment is blocked** until its SDK stdio launch path has an app-owned ownership/containment adapter. The shared background launcher cannot replace MCP stdio. No route is changed automatically.
+AutoCAD pins `universal-codex-tools==0.20.0` at commit `5b2cac50ca24d21a15b732e0424bb02fd794e1fb`, retaining **MCP Python SDK 2.3.0**. Shared code now supplies durable resource ownership to the direct server. AutoCAD keeps its independent application, CLI, native endpoint, plugin and skills. The experimental `ApplicationHost` remains a source prototype: **host/proxy CLI deployment is blocked** until its SDK stdio launch path has an app-owned ownership/containment adapter. The shared background launcher cannot replace MCP stdio. No route is changed automatically.
 
 ```mermaid
 flowchart LR
@@ -13,7 +13,7 @@ flowchart LR
     S --> D[Preserved drawing snapshots]
 ```
 
-The front door uses the framework's existing search, description, invocation, receipt and session schemas. Its historical `broker_status` tool describes this app host. Version 0.6 exposes 38 definitions on both `drawing-engine` and direct `serve`, retaining the original 31 and adding guide/reference, capability, job and artifact tools. Backend job starts are rejected and job mutations remain outside the host write allowlist. Existing handler schemas, structured results, source checks and durable app receipts remain authoritative.
+The front door uses the framework's existing search, description, invocation, receipt and session schemas. Its historical `broker_status` tool describes this app host. The source exposes 38 definitions on both `drawing-engine` and direct `serve`, retaining the original 31 and adding guide/reference, capability, job and artifact tools. Backend job starts are rejected and job mutations remain outside the host write allowlist. Existing handler schemas, structured results, source checks and durable app receipts remain authoritative.
 
 ## Dependency and packaging
 
@@ -28,7 +28,7 @@ python scripts/framework_dependency.py 'C:\Packages\universal_codex_tools-0.20.0
 
 Manual installation uses `pip install --require-hashes --find-links C:\Packages -r requirements-lock.txt`, then `pip install --no-deps -e .`. Development uses the development lock similarly. A source ZIP does not redistribute the framework wheel or local bindings. Record artifact hashes and dependency versions in private acceptance evidence. An incompatible future SDK/native dependency set requires a separately managed out-of-process host; do not downgrade the app to force a shared environment. No native .NET/NuGet framework binding is assumed.
 
-The direct server and app-owned host require SDK 2.3.0 and the pinned framework. Version 0.6 uses its extension/resource lifecycle directly; SDK 1.x is outside this app's supported runtime.
+The direct server and app-owned host require SDK 2.3.0 and the pinned framework. The app uses its extension/resource lifecycle directly; SDK 1.x is outside this app's supported runtime.
 
 The framework's supported interoperability floor is SDK 2.2; its upstream matrix covers 2.2.0 and 2.3.0. AutoCAD's own dependency remains exactly 2.3.0. The default downstream wire contract is the negotiated `2025-11-25` legacy handshake, independent of the SDK package version. SDK 2 Python fields use snake_case; wire serialization uses `model_dump(by_alias=True, mode="json")`, typed pagination and `_meta` for custom extensions. The framework captures retained connection identity across request-scoped session proxies. AutoCAD adds no owner ID argument or custom form relay. Index progress uses the initiating SDK request context. There is no app form workflow or chat-settings permission adapter here, and no published .NET binding.
 

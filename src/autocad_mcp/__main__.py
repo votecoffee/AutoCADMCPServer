@@ -19,7 +19,14 @@ def main():
             from .autocad import run_worker
         run_worker(*sys.argv[2:])
         return
+    from . import __display_version__, __version__
+
     parser = argparse.ArgumentParser(description="AutoCAD MCP Server - local DWG/DXF/PDF extraction")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"AutoCAD MCP Server {__display_version__} (package {__version__})",
+    )
     parser.add_argument("--config", default=os.environ.get("AUTOCAD_MCP_CONFIG", ".local/config.json"))
     sub = parser.add_subparsers(dest="command", required=True)
     serve = sub.add_parser("serve")

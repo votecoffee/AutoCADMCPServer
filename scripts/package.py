@@ -3,9 +3,10 @@
 import argparse
 import hashlib
 import json
-import tomllib
 import zipfile
 from pathlib import Path
+
+from release_version import check
 
 ROOT_FILES = (
     ".gitattributes",
@@ -43,6 +44,8 @@ def selected_files(repo):
 
 def verify(repo):
     manifest = json.loads((repo / "manifest.json").read_text(encoding="utf-8"))
+    if any(manifest.get(key) != value for key, value in check(repo).items()):
+        raise ValueError("Manifest release identity differs from source")
     expected = set(manifest["files"])
     actual = {path.relative_to(repo).as_posix() for path in selected_files(repo)}
     if actual != expected:
@@ -68,7 +71,7 @@ def main():
     files = selected_files(repo)
     manifest = {
         "schema_version": 1,
-        "version": tomllib.loads((repo / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"],
+        **check(repo),
         "files": {
             path.relative_to(repo).as_posix(): {
                 "sha256": digest(path.read_bytes()),

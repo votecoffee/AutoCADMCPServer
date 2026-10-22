@@ -16,7 +16,7 @@ from pathlib import Path
 import ezdxf
 import pymupdf
 
-from . import EXTRACTION_VERSION, __version__
+from . import EXTRACTION_VERSION, __display_version__, __version__
 from .config import SUPPORTED, Config
 from .coordination import Coordinator
 from .owned_process import run_owned
@@ -124,6 +124,7 @@ class DrawingService:
         return {
             "name": "AutoCAD MCP Server",
             "version": __version__,
+            "display_version": __display_version__,
             "roots": {k: str(v) for k, v in self.config.roots.items()},
             "state_dir": str(self.config.state),
             "supported_extensions": sorted(SUPPORTED),

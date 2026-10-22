@@ -1,6 +1,6 @@
 # Current guidance and Skills-over-MCP
 
-AutoCAD 0.6 keeps its own focused `drawing-analysis` packaged skill as a stable bootstrap. Its name, description and scope belong to AutoCAD's independent Codex plugin. There is no universal plugin or aggregate Codex connection. `guidance.py` is the canonical detailed source. `workflow_guidance.py` renders that source into an overview, topic references, metadata and a complete MCP skill manifest; no separately maintained procedural copy is shipped.
+AutoCAD keeps its own focused `drawing-analysis` packaged skill as a stable bootstrap. Its name, description and scope belong to AutoCAD's independent Codex plugin. There is no universal plugin or aggregate Codex connection. `guidance.py` is the canonical detailed source. `workflow_guidance.py` renders that source into an overview, topic references, metadata and a complete MCP skill manifest; no separately maintained procedural copy is shipped.
 
 ## Ordinary readers
 

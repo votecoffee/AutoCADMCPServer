@@ -1,6 +1,6 @@
 # Electrical project analysis
 
-Version 0.2 adds project inventories, PLC I/O, connection graphs, equipment groups, network observations, consistency checks, revision comparison and JSON exports. All operations share `ElectricalService` behind the CLI and MCP adapters. The [export schema](../schemas/electrical-project.schema.json) defines snapshot version 1.
+Project operations provide inventories, PLC I/O, connection graphs, equipment groups, network observations, consistency checks, revision comparison and JSON exports. All operations share `ElectricalService` behind the CLI and MCP adapters. The [export schema](../schemas/electrical-project.schema.json) defines snapshot version 1.
 
 ## Workflow
 

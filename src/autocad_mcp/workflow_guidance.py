@@ -10,7 +10,7 @@ from pathlib import Path
 
 from universal_tools.skill_catalog import SkillCatalog
 
-from . import __version__
+from . import __display_version__, __version__
 from .guidance import WORKFLOW
 
 NAME = "drawing-analysis"
@@ -70,6 +70,7 @@ def render(text: str = WORKFLOW) -> dict[str, bytes]:
         "app_id": "autocad",
         "workflow_id": NAME,
         "app_version": __version__,
+        "app_display_version": __display_version__,
         "workflow_revision": revision,
         "sha256": digest(main.encode()),
         "text": main,

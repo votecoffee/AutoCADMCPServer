@@ -1,6 +1,6 @@
 # Resource ownership and lifecycle
 
-AutoCAD 0.6 uses the reviewed shared framework 0.20.0 `ResourceLedger` and `ResourceOwner`. Each direct server is the actual supervisor of its private workers. A temporary registration helper never becomes the owner of surviving software. The independent AutoCAD plugin and native skill remain the only Codex installation; no universal plugin or connection is involved.
+AutoCAD uses the reviewed shared framework 0.20.0 `ResourceLedger` and `ResourceOwner`. Each direct server is the actual supervisor of its private workers. A temporary registration helper never becomes the owner of surviving software. The independent AutoCAD plugin and native skill remain the only Codex installation; no universal plugin or connection is involved.
 
 ## Launch paths
 

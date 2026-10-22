@@ -1,6 +1,6 @@
 # Service management
 
-AutoCAD 0.6 uses the shared framework 0.20 management/resource interface. It reports to the independent Windows MCP Service Manager; AutoCAD setup does not install or launch another manager. The standalone plugin and native tool schemas remain independent. See [resource ownership](resource-ownership.md) for exact launch coverage and acceptance limits.
+AutoCAD uses the shared framework 0.20 management/resource interface. It reports to the independent Windows MCP Service Manager; AutoCAD setup does not install or launch another manager. The standalone plugin and native tool schemas remain independent. See [resource ownership](resource-ownership.md) for exact launch coverage and acceptance limits.
 
 ## Owning processes
 
@@ -10,7 +10,7 @@ The default private registry uses the Windows Local AppData known folder without
 
 The management callback reads only cached component metadata and synchronized in-memory request counters. Pending and active requests, including control requests and owned index jobs, count as work. A separate bounded background refresh reads installed distribution metadata, local publisher version metadata and the fixed read-only Codex plugin inventory. It does not read drawing content, attach AutoCAD, contact controllers or poll package feeds. Inventory failures mark cached data stale. Unknown availability remains unknown; update-pending flags use explicit numeric local-version comparisons. Installed and running versions remain distinct.
 
-Generated plugin bindings identify their package version through `AUTOCAD_MCP_PLUGIN_VERSION`. A manually started process leaves that value unknown. Framework and SDK availability remain unknown without a configured release source. Updating native plugin bytes still needs installation and host reload.
+Generated plugin bindings identify their canonical package version through `AUTOCAD_MCP_PLUGIN_VERSION` and padded display stamp through `AUTOCAD_MCP_PLUGIN_DISPLAY_VERSION`. The manager message includes the running app display stamp; component versions use canonical numeric identities and semantic comparisons. See [release versions](versioning.md). A manually started process leaves that value unknown. Framework and SDK availability remain unknown without a configured release source. Updating native plugin bytes still needs installation and host reload.
 
 ## Restart boundary
 

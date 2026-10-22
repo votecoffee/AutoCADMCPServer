@@ -1,6 +1,6 @@
 # Concurrent requests and operation receipts
 
-Version 0.3 runs blocking MCP operations in a bounded thread pool. HTTP sessions and stdio callers can overlap requests. Separate plugin/chat processes coordinate through the same configured app-state directory. Extraction, rendering, PDF tables and AutoCAD highlighting run in bounded child processes. Transport handling stays available while those workers run.
+Blocking MCP operations run in a bounded thread pool. HTTP sessions and stdio callers can overlap requests. Separate plugin/chat processes coordinate through the same configured app-state directory. Extraction, rendering, PDF tables and AutoCAD highlighting run in bounded child processes. Transport handling stays available while those workers run.
 
 ## Limits and resource ownership
 

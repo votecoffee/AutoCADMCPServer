@@ -16,7 +16,7 @@ from universal_tools import __version__ as framework_version
 from universal_tools.management import ComponentVersion, ManagedService, ManagedStatus, RestartResult
 from universal_tools.manager_inventory import CodexInventory, newer_numeric_version, parse_inventory
 
-from . import __version__
+from . import __display_version__, __version__
 from .owned_process import run_owned
 from .owned_resources import owned_resources
 
@@ -187,6 +187,7 @@ class Reporting:
         return ManagedStatus(
             state="busy" if active else ("degraded" if warning else "running"),
             message=(warning or "Drawing service process; no drawings opened for status")
+            + f"; release {__display_version__} (package {__version__})"
             + f"; owned worker trees: {resources['owned_tree_count']}; protected attachments: {resources['attached_count']}",
             active_operations=active,
             versions=versions,

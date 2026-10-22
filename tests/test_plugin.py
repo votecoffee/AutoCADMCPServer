@@ -2,6 +2,7 @@ import json
 import shutil
 from pathlib import Path
 
+from autocad_mcp import __display_version__, __version__
 from scripts.install_plugin import FILES, prepare
 
 
@@ -28,12 +29,17 @@ def test_plugin_binding_is_local_independent_and_relocatable(tmp_path):
     package = Path(result["package"])
     manifest = json.loads((package / "plugin.json").read_text(encoding="utf-8"))
     assert manifest["name"] == "autocad"
+    assert manifest["version"] == __version__
+    assert json.loads((package / ".codex-plugin/plugin.json").read_bytes())["version"] == __version__
+    assert result["version"] == __version__ and result["display_version"] == __display_version__
+    assert package.name.startswith("autocad-" + __version__ + "-")
     servers = json.loads((package / "mcp.json").read_text(encoding="utf-8"))["mcpServers"]
     assert (
         servers["autocad"]["env"]["AUTOCAD_MCP_PLUGIN_VERSION"]
         == json.loads((template / "plugin.json").read_bytes())["version"]
     )
     assert set(servers) == {"autocad"}
+    assert servers["autocad"]["env"]["AUTOCAD_MCP_PLUGIN_DISPLAY_VERSION"] == __display_version__
     assert servers["autocad"]["command"] == str(python)
     assert servers["autocad"]["args"] == ["-m", "autocad_mcp", "--config", str(config), "serve"]
     assert (

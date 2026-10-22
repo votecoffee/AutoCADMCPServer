@@ -7,7 +7,7 @@ import threading
 
 from universal_tools.management import ManagementClient
 
-from autocad_mcp import __version__
+from autocad_mcp import __display_version__, __version__
 from autocad_mcp.management import PLUGIN_ID, RESTART_REASON, Activity, Reporting
 
 
@@ -43,6 +43,7 @@ def test_cached_versions_and_status_do_not_read_projects_or_inventory(tmp_path, 
     monkeypatch.setattr(reporter.inventory, "refresh", lambda: (_ for _ in ()).throw(AssertionError()))
     status = reporter.status()
     assert status.versions["app"].running == __version__
+    assert f"release {__display_version__} (package {__version__})" in status.message
     assert status.versions["app"].available == "99.0.0" and status.versions["app"].update_pending
     assert status.versions["plugin"].running == "0.1.0" and status.versions["plugin"].update_pending
     assert status.versions["framework"].available is None

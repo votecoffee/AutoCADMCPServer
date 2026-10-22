@@ -47,7 +47,13 @@ def main():
     if not 1 <= args.port <= 65535:
         parser.error("--port must be 1..65535")
     from framework_dependency import stage
+    from release_version import check
 
+    release = check(REPO)
+    print(
+        f"AutoCAD MCP Server {release['display_version']} (package {release['version']})",
+        file=sys.stderr,
+    )
     wheel_directory = stage(REPO, args.framework_wheel)
     environment = REPO / ".venv"
     python = environment / "Scripts" / "python.exe"

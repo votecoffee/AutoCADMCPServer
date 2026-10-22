@@ -1,12 +1,15 @@
 """Implementation profile, including precise opt-in and acceptance boundaries."""
 
-from . import __version__
+from . import __display_version__, __version__
+from .version import VERSION_TIMEZONE
 
 
 def report(backend=False):
     return {
         "app_id": "autocad",
         "version": __version__,
+        "display_version": __display_version__,
+        "version_timezone": VERSION_TIMEZONE,
         "framework": "0.20.0",
         "sdk": "2.3.0",
         "selected_surface": "drawing-engine backend" if backend else "direct native server",

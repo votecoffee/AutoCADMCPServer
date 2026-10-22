@@ -4,7 +4,9 @@
 
 Source-preserving local DWG, DXF, PDF and AutoCAD Electrical information extraction for MCP
 
-Extract drawing information through a shared Python service, command line interface and Model Context Protocol server. Device and PLC I/O inventories, connection tracing, equipment grouping, documented network inventory, consistency checks, revision comparison and JSON exports retain source evidence. Version 0.6 adds current guidance, bounded index jobs/artifacts and durable ownership of private worker trees while retaining AutoCAD's independent plugin and native endpoint. Experimental app-host deployment is blocked pending its SDK stdio ownership adapter. Native report assertions, observed attributes and interpretation stay distinct. Sources are preserved; optional guarded highlighting affects an unchanged drawing already open in AutoCAD. The repository is named `AutoCADMCPServer`; the Python distribution is `autocad-mcp-server`.
+Extract drawing information through a shared Python service, command line interface and Model Context Protocol server. Device and PLC I/O inventories, connection tracing, equipment grouping, documented network inventory, consistency checks, revision comparison and JSON exports retain source evidence. Current guidance, bounded index jobs/artifacts and durable ownership of private worker trees retain AutoCAD's independent plugin and native endpoint. Experimental app-host deployment is blocked pending its SDK stdio ownership adapter. Native report assertions, observed attributes and interpretation stay distinct. Sources are preserved; optional guarded highlighting affects an unchanged drawing already open in AutoCAD. The repository is named `AutoCADMCPServer`; the Python distribution is `autocad-mcp-server`.
+
+Current source release: **26.1022.173932**, stamped once in `America/New_York`. The app and both plugin manifests share the canonical package version `26.1022.173932`. [Versioning](docs/versioning.md) explains padded display timestamps, leading-zero normalization and release checks. Framework `0.20.0` and MCP SDK `2.3.0` remain independently pinned. Source/package verification does not establish installed or native acceptance.
 
 ## Table of Contents
 
@@ -82,6 +84,7 @@ Server instances and worker descendants have explicit ownership limits and share
 ### CLI
 
 ```powershell
+.venv\Scripts\python.exe -m autocad_mcp --version
 .venv\Scripts\python.exe -m autocad_mcp inventory drawings
 .venv\Scripts\python.exe -m autocad_mcp inspect drawings 'Assembly.dwg'
 .venv\Scripts\python.exe -m autocad_mcp text drawings 'Electrical.pdf'
@@ -135,9 +138,9 @@ See [shared framework setup](docs/shared-app-framework.md) and [feature profiles
 
 ### Standalone Codex plugin
 
-AutoCAD 0.5 reports owning service processes and cached component versions to the existing Windows MCP Service Manager. Restart remains disabled until an app-owned supervisor can enforce quiescence across chats. Setup does not install another manager. See [service management](docs/service-management.md) for instance lifetimes, version reporting and the restart boundary.
+AutoCAD reports owning service processes and cached component versions to the existing Windows MCP Service Manager. Restart remains disabled until an app-owned supervisor can enforce quiescence across chats. Setup does not install another manager. See [service management](docs/service-management.md) for instance lifetimes, version reporting and the restart boundary.
 
-AutoCAD 0.6 keeps the packaged `drawing-analysis` skill short and stable. It reads detailed guidance from `cad_get_workflow` and revision/hash-pinned topic references. The same canonical source generates real Skills-over-MCP manifests/resources on direct servers and the app-owned HTTP host. Connected guide publications keep native tool definitions stable; native plugin/skill metadata changes still need installation/reload. See [guidance and skill profiles](docs/workflow-guidance.md).
+AutoCAD keeps the packaged `drawing-analysis` skill short and stable. It reads detailed guidance from `cad_get_workflow` and revision/hash-pinned topic references. The same canonical source generates real Skills-over-MCP manifests/resources on direct servers and the app-owned HTTP host. Connected guide publications keep native tool definitions stable; native plugin/skill metadata changes still need installation/reload. See [guidance and skill profiles](docs/workflow-guidance.md).
 
 For long index batches, direct-owner job tools provide durable submission, real file-unit progress and cooperative cancellation between files. Preview/export receipts provide scoped, hash-pinned 64 KiB reads and native resource views where supported. `cad_capabilities` reports implementation and acceptance boundaries. See [jobs, caching and artifacts](docs/runtime-features.md).
 

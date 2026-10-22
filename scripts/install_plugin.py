@@ -27,15 +27,22 @@ def prepare(repo: Path, config: Path | None = None, *, frontend="legacy", host_s
     python = repo / ".venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
     if not python.is_file():
         raise ValueError("Run InstallAndRun.cmd --install-only first")
+    from autocad_mcp import __display_version__, __version__
     from autocad_mcp.config import Config
 
     Config.load(config)
+    for name in ("plugin.json", ".codex-plugin/plugin.json"):
+        if json.loads((template / name).read_bytes())["version"] != __version__:
+            raise ValueError("Plugin manifest must match the app package version")
     server = {
         "type": "stdio",
         "command": str(python),
         "args": ["-m", "autocad_mcp", "--config", str(config), "serve"],
         "cwd": str(repo),
-        "env": {"AUTOCAD_MCP_PLUGIN_VERSION": json.loads((template / "plugin.json").read_bytes())["version"]},
+        "env": {
+            "AUTOCAD_MCP_PLUGIN_VERSION": __version__,
+            "AUTOCAD_MCP_PLUGIN_DISPLAY_VERSION": __display_version__,
+        },
     }
     if frontend == "framework":
         if host_state is None or not (host_state / "autocad-application.json").is_file():
@@ -70,7 +77,7 @@ def prepare(repo: Path, config: Path | None = None, *, frontend="legacy", host_s
         b"".join(name.encode() + b"\0" + contents[name] for name in sorted(contents))
     ).hexdigest()[:16]
     root = repo / ".local" / "codex-marketplace"
-    package = root / "packages" / ("autocad-" + digest)
+    package = root / "packages" / ("autocad-" + __version__ + "-" + digest)
     for name, data in contents.items():
         path = package / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -102,6 +109,8 @@ def prepare(repo: Path, config: Path | None = None, *, frontend="legacy", host_s
         "transport": "stdio",
         "standalone": True,
         "frontend": frontend,
+        "version": __version__,
+        "display_version": __display_version__,
     }
 
 

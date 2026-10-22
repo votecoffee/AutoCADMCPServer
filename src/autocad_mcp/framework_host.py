@@ -12,7 +12,7 @@ import sys
 from contextlib import asynccontextmanager, closing
 from pathlib import Path
 
-from . import __version__
+from . import __display_version__, __version__
 from .config import Config, inside
 from .coordination import Coordinator
 from .integration import HIGHLIGHT, OFFLINE_WRITES
@@ -113,6 +113,7 @@ def prepare(
     manifest = {
         "schema_version": 1,
         "app_version": __version__,
+        "app_display_version": __display_version__,
         "python_version": platform.python_version(),
         "dependencies": dependencies,
         "config": str(config_path),
