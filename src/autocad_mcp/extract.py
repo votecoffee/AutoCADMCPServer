@@ -3,12 +3,12 @@ from __future__ import annotations
 import collections
 import json
 import math
-import os
-import subprocess
 from pathlib import Path
 
 import ezdxf
 import pymupdf
+
+from .owned_process import run_owned
 
 
 def clean(value):
@@ -32,8 +32,7 @@ def convert(source: Path, executable: str | None) -> tuple[Path, dict]:
     output.mkdir()
     # Only the isolated source copy is visible to the converter; audit and recursion are disabled.
     args = [executable, str(source.parent), str(output), "ACAD2018", "DXF", "0", "0", source.name]
-    opts = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
-    result = subprocess.run(args, check=False, capture_output=True, timeout=60, **opts)
+    result = run_owned(args, check=False, timeout=60, resource_kind="oda-converter")
     candidates = list(output.glob("*.dxf")) + list(output.glob("*.DXF"))
     candidates = list(dict.fromkeys(candidates))
     if result.returncode or len(candidates) != 1:

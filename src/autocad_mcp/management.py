@@ -15,6 +15,7 @@ from universal_tools.management import ComponentVersion, ManagedService, Managed
 from universal_tools.manager_inventory import CodexInventory, newer_numeric_version
 
 from . import __version__
+from .owned_resources import owned_resources
 
 PLUGIN_ID = "autocad@autocad-local"
 RESTART_REASON = (
@@ -125,12 +126,15 @@ class Reporting:
     def status(self):
         counts = self.activity()
         active = counts["active"] + counts["queued"] + counts["control_requests"]
+        resources = owned_resources.snapshot()
+        active = max(active, resources["active_count"])
         with self.guard:
             versions = {key: value.model_copy(deep=True) for key, value in self.versions.items()}
             warning = self.metadata_warning
         return ManagedStatus(
             state="busy" if active else ("degraded" if warning else "running"),
-            message=warning or "Drawing service process; no drawings opened for status",
+            message=(warning or "Drawing service process; no drawings opened for status")
+            + f"; owned worker trees: {resources['active_count']}; attached apps are preserved",
             active_operations=active,
             versions=versions,
             restart_allowed=False,

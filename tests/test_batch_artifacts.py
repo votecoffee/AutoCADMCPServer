@@ -119,6 +119,22 @@ def test_job_binds_selected_paths_and_hashes_before_dispatch(drawing_service):
         assert db.execute("SELECT * FROM documents").fetchall() == prior
 
 
+def test_owner_close_cancels_queued_jobs_and_rejects_new_work(drawing_service):
+    from autocad_mcp.coordination import ResourceBusy
+
+    service, _ = drawing_service
+    jobs = BatchJobs(service)
+    for _ in range(service.config.max_concurrent_requests):
+        jobs.slots.acquire()
+    started = jobs.start("test", 0, 1)
+    assert jobs.close(timeout=0)["still_active"] == 1
+    with pytest.raises(ResourceBusy, match="shutting down"):
+        jobs.start("test", 0, 1)
+    for _ in range(service.config.max_concurrent_requests):
+        jobs.slots.release()
+    assert wait_job(jobs, started)["state"] == "cancelled"
+
+
 def test_process_loss_preserves_unknown_job_and_one_effect(drawing_service, tmp_path):
     import json
     import os

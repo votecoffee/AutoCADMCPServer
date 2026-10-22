@@ -14,6 +14,7 @@ from pathlib import Path
 
 from . import __version__
 from .config import Config, inside
+from .coordination import Coordinator
 from .integration import HIGHLIGHT, OFFLINE_WRITES
 
 FRAMEWORK_VERSION = "0.18.0"
@@ -289,6 +290,15 @@ def create_host(state: Path, publication: Path, config_path: Path, **kwargs):
 
 
 def serve(state: Path, publication: Path, config_path: Path, *, registry=None):
+    from .lifetime import server_lifetime
+
+    config = Config.load(config_path)
+    with server_lifetime(config):
+        with Coordinator(config.state).lock("framework-host:" + str(state.resolve()), timeout=0):
+            _serve(state, publication, config_path, registry=registry)
+
+
+def _serve(state: Path, publication: Path, config_path: Path, *, registry=None):
     import secrets
 
     import uvicorn
@@ -327,6 +337,15 @@ def serve(state: Path, publication: Path, config_path: Path, *, registry=None):
 
 
 def proxy(state: Path):
+    from .lifetime import parent_lifetime
+
+    state = state.resolve(strict=True)
+    with Coordinator(state).pool("servers:proxy", 2, timeout=0):
+        with parent_lifetime(stdio=True):
+            _proxy(state)
+
+
+def _proxy(state: Path):
     require_framework()
     from universal_tools.models import load_settings
     from universal_tools.surface import RemoteBackend, create_surface

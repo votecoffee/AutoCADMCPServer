@@ -75,6 +75,8 @@ Repeat `--root name=directory` to configure multiple projects. Configuration, ca
 
 ## Usage
 
+Server instances and worker descendants have explicit ownership limits. See [process lifetimes and shutdown](docs/service-management.md#process-lifetimes-and-shutdown) for the source implementation and remaining Windows acceptance checks. A service restart remains disabled.
+
 ### CLI
 
 ```powershell

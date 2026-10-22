@@ -75,8 +75,8 @@ class Coordinator:
             self._release(stream)
 
     @contextlib.contextmanager
-    def pool(self, name: str, count: int):
-        deadline = time.monotonic() + self.timeout
+    def pool(self, name: str, count: int, timeout: float | None = None):
+        deadline = time.monotonic() + (self.timeout if timeout is None else timeout)
         stream = None
         while stream is None:
             for index in range(count):

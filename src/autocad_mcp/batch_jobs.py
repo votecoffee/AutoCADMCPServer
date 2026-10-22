@@ -5,6 +5,7 @@ import json
 import secrets
 import sqlite3
 import threading
+import time
 import uuid
 from contextlib import contextmanager
 
@@ -17,6 +18,8 @@ class BatchJobs:
         self.path = service.config.state / "batch-jobs.sqlite3"
         self.guard = threading.Lock()
         self.active = 0
+        self.closing = threading.Event()
+        self.threads = {}
         self.slots = threading.BoundedSemaphore(service.config.max_concurrent_requests)
         self.scope = hashlib.sha256(
             json.dumps(
@@ -48,7 +51,24 @@ class BatchJobs:
         with self.guard:
             return self.active
 
+    def close(self, timeout=2):
+        """Stop admission and request only this owner's jobs to stop; never replay."""
+        with self.guard:
+            self.closing.set()
+            threads = dict(self.threads)
+        with self.connect() as db:
+            db.executemany(
+                "UPDATE jobs SET cancel=1,state=CASE WHEN state='queued' THEN 'cancelled' ELSE 'cancel_requested' END WHERE id=? AND state IN ('queued','running')",
+                ((job,) for job in threads),
+            )
+        deadline = time.monotonic() + timeout
+        for thread in threads.values():
+            thread.join(timeout=max(0, deadline - time.monotonic()))
+        return {"still_active": sum(thread.is_alive() for thread in threads.values())}
+
     def start(self, root_id, offset=0, limit=5):
+        if self.closing.is_set():
+            raise ResourceBusy("Index job owner is shutting down")
         if root_id not in self.service.config.roots or offset < 0 or not 1 <= limit <= 5:
             raise ValueError("Select a configured root, nonnegative offset and 1..5 files")
         from .service import sha256
@@ -96,15 +116,20 @@ class BatchJobs:
                     ),
                 )
             with self.guard:
+                if self.closing.is_set():
+                    raise ResourceBusy("Index job owner is shutting down; inspect submitted intent")
                 self.active += 1
                 counted = True
-            threading.Thread(
-                target=self._run, args=(job, lease), daemon=True, name="autocad-index-job"
-            ).start()
+                thread = threading.Thread(
+                    target=self._run, args=(job, lease), daemon=True, name="autocad-index-job"
+                )
+                self.threads[job] = thread
+                thread.start()
         except BaseException:
             if counted:
                 with self.guard:
                     self.active -= 1
+                    self.threads.pop(job, None)
             lease.__exit__(None, None, None)
             raise
         return {
@@ -161,6 +186,8 @@ class BatchJobs:
         return self.get(job, token)
 
     def _cancelled(self, job):
+        if self.closing.is_set():
+            return True
         with self.connect() as db:
             return bool(db.execute("SELECT cancel FROM jobs WHERE id=?", (job,)).fetchone()[0])
 
@@ -170,6 +197,7 @@ class BatchJobs:
                 with self.connect() as db:
                     db.execute("BEGIN IMMEDIATE")
                     row = dict(db.execute("SELECT * FROM jobs WHERE id=?", (job,)).fetchone())
+                    row["cancel"] = row["cancel"] or self.closing.is_set()
                     db.execute(
                         "UPDATE jobs SET state=? WHERE id=?",
                         ("cancelled" if row["cancel"] else "running", job),
@@ -209,3 +237,4 @@ class BatchJobs:
             lease.__exit__(None, None, None)
             with self.guard:
                 self.active -= 1
+                self.threads.pop(job, None)

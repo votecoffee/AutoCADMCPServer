@@ -114,33 +114,53 @@ def main():
             framework_host.proxy(state)
         return
     from .config import Config
+
+    config = Config.load(args.config)
+    if args.command == "serve":
+        from .lifetime import server_lifetime
+
+        with server_lifetime(config, backend=args.workflow, stdio=args.transport == "stdio"):
+            _serve(config, args)
+        return
     from .service import DrawingService
 
-    service = DrawingService(Config.load(args.config))
-    if args.command == "serve":
-        from .coordination import RequestScheduler
-        from .server import SDK2, create_server
+    service = DrawingService(config)
+    _execute(service, args)
 
-        scheduler = RequestScheduler(
-            service.config.max_concurrent_requests, service.config.max_queued_requests
-        )
-        server = create_server(service, args.port, workflow=args.workflow, scheduler=scheduler)
-        reporting = nullcontext()
-        if not args.workflow:
-            from .management import Reporting
 
-            def activity():
-                value = scheduler.status()
-                value["active"] += service.batch_jobs.activity()
-                return value
+def _serve(config, args):
+    from .coordination import RequestScheduler
+    from .owned_resources import owned_resources
+    from .server import create_server
+    from .service import DrawingService
 
-            reporting = Reporting(activity, registry=args.management_registry)
+    service = DrawingService(config)
+    scheduler = RequestScheduler(service.config.max_concurrent_requests, service.config.max_queued_requests)
+    server = create_server(service, args.port, workflow=args.workflow, scheduler=scheduler)
+    reporting = nullcontext()
+    if not args.workflow:
+        from .management import Reporting
+
+        def activity():
+            value = scheduler.status()
+            value["active"] += service.batch_jobs.activity()
+            return value
+
+        reporting = Reporting(activity, registry=args.management_registry)
+    try:
         with reporting:
-            if args.transport == "stdio" or not SDK2:
-                server.run(transport=args.transport)
+            if args.transport == "stdio":
+                server.run(transport="stdio")
             else:
                 server.run(transport="streamable-http", host="127.0.0.1", port=args.port)
-        return
+    finally:
+        try:
+            service.batch_jobs.close()
+        finally:
+            owned_resources.close()
+
+
+def _execute(service, args):
     if args.command.startswith("electrical-"):
         from pathlib import Path
 

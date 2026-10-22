@@ -5,10 +5,10 @@ from __future__ import annotations
 import json
 import os
 import re
-import subprocess
 import uuid
 from pathlib import Path
 
+from .owned_process import run_owned
 from .service import sha256
 from .worker_launch import worker_command
 
@@ -33,11 +33,18 @@ def highlight_document(application, filename: str, handle: str, enabled: bool, e
     }
     if expected_type in expected_names and entity.ObjectName != expected_names[expected_type]:
         raise ValueError("Object type differs from extracted evidence")
-    document.Activate()
-    entity.Highlight(enabled)
-    entity.Update()
+    outcome = {"status": "COM_call_completed"}
+    try:
+        document.Activate()
+        entity.Highlight(enabled)
+        entity.Update()
+    except Exception:
+        outcome = {
+            "status": "unknown",
+            "error": "Display operation did not confirm completion; inspect AutoCAD before retrying",
+        }
     return {
-        "status": "COM_call_completed",
+        **outcome,
         "object_handle": handle,
         "enabled": enabled,
         "object_name": str(entity.ObjectName),
@@ -56,6 +63,7 @@ def run_worker(request_file, response_file):
         import win32com.client
 
         pythoncom.CoInitialize()
+        application = None
         try:
             # GetActiveObject never starts AutoCAD or opens a drawing.
             application = win32com.client.GetActiveObject("AutoCAD.Application")
@@ -69,9 +77,17 @@ def run_worker(request_file, response_file):
                 request["expected_type"],
             )
         finally:
+            # The attachment is user-owned. Release our COM reference without
+            # Quit/Close/save, including on failure or dirty-state refusal.
+            application = None
             pythoncom.CoUninitialize()
     except Exception as error:
         result = {"status": "failed", "error": f"{type(error).__name__}: {error}"}
+    result["resource_ownership"] = {
+        "application": "attached_user_owned",
+        "cleanup": "release_COM_references_only",
+        "application_close_requested": False,
+    }
     Path(response_file).write_text(json.dumps(result), encoding="utf-8", newline="\n")
 
 
@@ -116,20 +132,17 @@ def highlight(service, source: dict, enabled=True):
     )
     with service.coordinator.lock("ui:autocad"), service.coordinator.worker():
         try:
-            subprocess.run(
+            run_owned(
                 worker_command("_highlight", str(request), str(response)),
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                resource_kind="highlight-helper",
                 timeout=30,
                 check=True,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
             result = json.loads(response.read_text(encoding="utf-8"))
-        except subprocess.TimeoutExpired:
+        except Exception:
             result = {
                 "status": "unknown",
-                "error": "Highlight worker timed out; inspect AutoCAD before retrying",
+                "error": "Highlight worker did not confirm completion; inspect AutoCAD before retrying",
             }
     result["source"] = source
     result["audit_path"] = str(response)

@@ -57,5 +57,8 @@ they do not forward native resource/skill methods. Never switch routes automatic
 Inspect cad_concurrency_status when busy. Only call cad_highlight_source_object when the user
 requests highlighting in an unchanged source already open in full AutoCAD. Highlighting affects
 the display only, is serialized across app processes, and unknown outcomes need inspection.
+cad_status resource_ownership describes only this process's live owned worker handles. Durable
+resource recovery remains blocked pending the shared ledger integration. Never kill software by
+name or a stale PID, close an attached user-owned application or treat process exit as rollback.
 No controller, drawing-edit, deployment or automatic route-failover operations are provided.
 """

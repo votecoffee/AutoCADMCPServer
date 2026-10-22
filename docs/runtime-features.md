@@ -14,6 +14,7 @@
 | Approval continuations | Outside current offline workflow | No new approval prompts for metadata/state-only work; highlighting retains the user's request and native source preflight |
 | Preview/export resources | Enabled; completed receipt, root scope, hash and bounded byte reads tested | Same-user app-state scope, not per-chat confidentiality; native fixed proxies use the ordinary reader |
 | Service management | Enabled, cached status and versions | Restart disabled; no surviving supervisor/cross-chat quiescence fence |
+| Process lifetimes | Implemented, operationally unassessed; bounded instance leases, Windows owned descendants and parent/EOF fences | Windows synthetic shutdown/owner-loss checks must pass before deployment; no native rollback or detached supervisor claim |
 | Redis, remote OAuth, MCP Apps | Deferred | No deployment requirement or native/UI acceptance is implied by the dependency |
 
 ## Retained modern pilot

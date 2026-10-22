@@ -6,5 +6,6 @@
   "max_queued_requests": 32,
   "max_worker_processes": 4,
   "max_oda_processes": 1,
+  "max_server_instances": 2,
   "lock_timeout_seconds": 180
 }

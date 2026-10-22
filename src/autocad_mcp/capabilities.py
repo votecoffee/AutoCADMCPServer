@@ -11,6 +11,14 @@ def report(backend=False):
         "sdk": "2.3.0",
         "selected_surface": "drawing-engine backend" if backend else "direct native server",
         "features": {
+            "process_lifetimes": {
+                "state": "implemented_unassessed",
+                "boundary": "Fail-fast per-state server leases, captured-parent/stdio EOF fences and Windows job-owned workers. Windows runtime shutdown/descendant acceptance is pending; no restart supervisor or native rollback claim.",
+            },
+            "durable_resource_recovery": {
+                "state": "blocked",
+                "reason": "Live exclusive-resource registry exists; shared-package durable ledger/API is pending. No restart/shared-manager recovery claim and no cleanup by PID/name guessing.",
+            },
             "workflow_readers": {
                 "state": "enabled",
                 "evidence": "revision/hash-pinned canonical guide and references",

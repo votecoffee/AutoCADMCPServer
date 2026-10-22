@@ -19,6 +19,8 @@ import pymupdf
 from . import EXTRACTION_VERSION, __version__
 from .config import SUPPORTED, Config
 from .coordination import Coordinator
+from .owned_process import run_owned
+from .owned_resources import owned_resources
 from .worker_launch import worker_command
 
 
@@ -129,11 +131,13 @@ class DrawingService:
             "oda_executable": str(self.config.oda_executable) if self.config.oda_executable else None,
             "engines": {"ezdxf": ezdxf.__version__, "PyMuPDF": pymupdf.VersionBind},
             "extraction_signature": self.signature,
+            "resource_ownership": owned_resources.snapshot(),
             "concurrency": {
                 "max_concurrent_requests_per_process": self.config.max_concurrent_requests,
                 "max_queued_requests_per_process": self.config.max_queued_requests,
                 "max_worker_processes_per_state": self.config.max_worker_processes,
                 "max_oda_processes_per_state": self.config.max_oda_processes,
+                "max_server_instances_per_role": self.config.max_server_instances,
                 "lock_timeout_seconds": self.config.lock_timeout_seconds,
                 "coordination": "Cross-process cache/index/AutoCAD locks; WAL index transactions; atomic snapshots/exports",
             },
@@ -213,20 +217,17 @@ class DrawingService:
                 str(destination),
                 json.dumps(options),
             )
-            opts = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
             try:
                 # A Windows venv launcher can stall when it inherits the active MCP input pipe.
                 # Workers take all input through argv/files and must never read that pipe.
                 with self.coordinator.worker(native=extension in {".dwg", ".dwt", ".dws"}):
-                    completed = subprocess.run(
+                    completed = run_owned(
                         args,
+                        resource_kind="extraction",
                         check=False,
-                        stdin=subprocess.DEVNULL,
-                        capture_output=True,
                         timeout=self.config.worker_timeout,
                         encoding="utf-8",
                         errors="replace",
-                        **opts,
                     )
             except subprocess.TimeoutExpired as error:
                 raise ValueError("Extraction worker timed out; no partial result published") from error
@@ -490,17 +491,14 @@ class DrawingService:
                     }
                 ),
             )
-            opts = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
             with self.coordinator.worker(native=source.suffix.lower() in {".dwg", ".dwt", ".dws"}):
-                result = subprocess.run(
+                result = run_owned(
                     args,
+                    resource_kind="render",
                     check=False,
-                    stdin=subprocess.DEVNULL,
-                    capture_output=True,
                     timeout=self.config.worker_timeout,
                     encoding="utf-8",
                     errors="replace",
-                    **opts,
                 )
             if result.returncode or not target.exists():
                 raise ValueError("Preview failed: " + result.stderr[-3000:])
@@ -527,9 +525,8 @@ class DrawingService:
             shutil.copyfile(source, staged)
             if sha256(staged) != doc["source"]["sha256"]:
                 raise ValueError("Source changed before table detection")
-            opts = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
             with self.coordinator.worker():
-                result = subprocess.run(
+                result = run_owned(
                     worker_command(
                         "_tables",
                         str(staged),
@@ -537,12 +534,10 @@ class DrawingService:
                         json.dumps({"page": page}),
                     ),
                     check=False,
-                    stdin=subprocess.DEVNULL,
-                    capture_output=True,
+                    resource_kind="tables",
                     timeout=self.config.worker_timeout,
                     encoding="utf-8",
                     errors="replace",
-                    **opts,
                 )
             if result.returncode or not destination.exists():
                 raise ValueError("PDF table worker failed: " + result.stderr[-3000:])
