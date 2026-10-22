@@ -14,6 +14,7 @@ async def test_cold_worker_extraction_through_real_stdio(drawing_service):
     parameters = StdioServerParameters(
         command=sys.executable,
         args=["-m", "autocad_mcp", "--config", str(source.parent / "config.json"), "serve"],
+        env={"AUTOCAD_MCP_MANAGEMENT_REGISTRY": str(source.parent / "management-registry")},
     )
     async with stdio_client(parameters) as (read, write):
         async with ClientSession(read, write, read_timeout_seconds=20.0) as client:
@@ -67,6 +68,7 @@ async def test_two_mcp_processes_share_transactions_and_state(drawing_service):
     parameters = StdioServerParameters(
         command=sys.executable,
         args=["-m", "autocad_mcp", "--config", str(source.parent / "config.json"), "serve"],
+        env={"AUTOCAD_MCP_MANAGEMENT_REGISTRY": str(source.parent / "management-registry")},
     )
     async with AsyncExitStack() as stack:
         clients = []

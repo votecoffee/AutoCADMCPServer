@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import sys
+from contextlib import nullcontext
 
 
 def main():
@@ -25,6 +26,9 @@ def main():
     serve.add_argument("--transport", choices=["stdio", "streamable-http"], default="stdio")
     serve.add_argument("--port", type=int, default=8796)
     serve.add_argument(
+        "--management-registry", help="Explicit private tray registry for isolated deployments"
+    )
+    serve.add_argument(
         "--workflow", action="store_true", help="Expose the backend's versioned workflow read tool"
     )
     prepare = sub.add_parser(
@@ -36,6 +40,7 @@ def main():
     host = sub.add_parser("framework-serve", help="Run the authenticated app-owned host; no universal daemon")
     host.add_argument("--host-state", required=True)
     host.add_argument("--publication")
+    host.add_argument("--management-registry", help="Explicit private tray registry for isolated deployments")
     proxy = sub.add_parser(
         "framework-proxy", help="Connect the standalone app frontend to its already-running host"
     )
@@ -94,6 +99,7 @@ def main():
                 state,
                 Path(args.publication) if args.publication else state / "autocad-application.json",
                 Path(args.config),
+                registry=args.management_registry,
             )
         else:
             framework_host.proxy(state)
@@ -103,13 +109,23 @@ def main():
 
     service = DrawingService(Config.load(args.config))
     if args.command == "serve":
+        from .coordination import RequestScheduler
         from .server import SDK2, create_server
 
-        server = create_server(service, args.port, workflow=args.workflow)
-        if args.transport == "stdio" or not SDK2:
-            server.run(transport=args.transport)
-        else:
-            server.run(transport="streamable-http", host="127.0.0.1", port=args.port)
+        scheduler = RequestScheduler(
+            service.config.max_concurrent_requests, service.config.max_queued_requests
+        )
+        server = create_server(service, args.port, workflow=args.workflow, scheduler=scheduler)
+        reporting = nullcontext()
+        if not args.workflow:
+            from .management import Reporting
+
+            reporting = Reporting(scheduler.status, registry=args.management_registry)
+        with reporting:
+            if args.transport == "stdio" or not SDK2:
+                server.run(transport=args.transport)
+            else:
+                server.run(transport="streamable-http", host="127.0.0.1", port=args.port)
         return
     if args.command.startswith("electrical-"):
         from pathlib import Path

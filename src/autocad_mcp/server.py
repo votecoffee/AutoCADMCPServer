@@ -24,8 +24,12 @@ from .service import DrawingService
 from .transactions import Transactions
 
 
-def create_server(service: DrawingService, port: int = 8796, *, workflow: bool = False) -> MCPServer:
-    scheduler = RequestScheduler(service.config.max_concurrent_requests, service.config.max_queued_requests)
+def create_server(
+    service: DrawingService, port: int = 8796, *, workflow: bool = False, scheduler=None
+) -> MCPServer:
+    scheduler = scheduler or RequestScheduler(
+        service.config.max_concurrent_requests, service.config.max_queued_requests
+    )
     transactions = Transactions(service.config.state, service.coordinator)
     mcp = MCPServer(
         "AutoCAD MCP Server",

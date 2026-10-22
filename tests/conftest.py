@@ -8,6 +8,11 @@ from autocad_mcp.config import Config
 from autocad_mcp.service import DrawingService
 
 
+@pytest.fixture(autouse=True)
+def isolated_management_registry(tmp_path, monkeypatch):
+    monkeypatch.setenv("AUTOCAD_MCP_MANAGEMENT_REGISTRY", str(tmp_path / "management-registry"))
+
+
 @pytest.fixture
 def drawing_service(tmp_path):
     source = tmp_path / "drawings"

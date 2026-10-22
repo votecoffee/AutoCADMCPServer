@@ -36,7 +36,7 @@ DWG conversion uses an independently installed ODA File Converter. DXF parsing u
 ### Dependencies
 
 - [Python](https://www.python.org/downloads/) 3.11 or later. The PowerShell examples use Python 3.13.
-- The verified local `universal-codex-tools==0.17.0` framework wheel built from the [pushed framework baseline](https://github.com/votecoffee/CodexMCPBroker/commit/87157f88de4a5320d2712224216b1e6f18a0ec8d). It is a normal pinned Python dependency; no public package feed is shipped yet. MCP is pinned at **2.3.0**; setup rejects an older framework SDK pin instead of downgrading the app. See [framework dependency and verification](docs/shared-app-framework.md#dependency-and-packaging).
+- The verified local `universal-codex-tools==0.18.0` framework wheel built from the [pushed framework baseline](https://github.com/votecoffee/CodexMCPBroker/commit/7d8a0ccdc06598313061147ee8774837118a8861). It is a normal pinned Python dependency; no public package feed is shipped yet. MCP is pinned at **2.3.0**; setup rejects an older framework SDK pin instead of downgrading the app. See [framework dependency and verification](docs/shared-app-framework.md#dependency-and-packaging).
 - [ODA File Converter](https://www.opendesign.com/guestfiles/oda_file_converter), installed separately, for DWG extraction. Windows installations are detected under `C:/Program Files/ODA`; an absolute executable path can also be configured. DXF and PDF extraction do not need ODA.
 
 Optional source highlighting requires full AutoCAD running on Windows and pywin32, included explicitly in the Windows runtime lock. TrueView and ODA do not provide the live operation.
@@ -48,7 +48,7 @@ From a checkout on Windows:
 For Windows setup and a foreground compatibility server, run `InstallAndRun.cmd` in the project root. On the first 0.4 setup, supply `--framework-wheel PATH`; the verified wheel is cached privately for subsequent installs. Setup creates or reuses this checkout's `.venv`, installs hash-locked dependencies and the application, preserves existing configuration, and starts legacy loopback MCP HTTP at `http://127.0.0.1:8796/mcp`. On first setup it prompts for a drawing folder. Python 3.11 or newer is required; `uv` is used when available, with pip as the fallback. ODA is installed separately. Framework source alignment does not automatically select its new host for an installed workflow.
 
 ```powershell
-.\InstallAndRun.cmd --framework-wheel 'C:\Packages\universal_codex_tools-0.17.0-py3-none-any.whl' --install-only
+.\InstallAndRun.cmd --framework-wheel 'C:\Packages\universal_codex_tools-0.18.0-py3-none-any.whl' --install-only
 .\InstallAndRun.cmd
 .\InstallAndRun.cmd --install-only
 .\InstallAndRun.cmd --port 8797
@@ -130,6 +130,8 @@ Explicit isolated setup uses `framework-prepare`, `framework-serve` and `framewo
 See [shared framework setup, lifecycle and limits](docs/shared-app-framework.md) for the assessed 0.17 profile and before a separately authorized pilot. One process owns the app host and its journals; concurrent frontends use that owner. The default installer uses the native stdio endpoint; framework plugin bindings are an explicit option requiring their own host acceptance.
 
 ### Standalone Codex plugin
+
+AutoCAD 0.5 reports owning service processes and cached component versions to the existing Windows MCP Service Manager. Restart remains disabled until an app-owned supervisor can enforce quiescence across chats. Setup does not install another manager. See [service management](docs/service-management.md) for instance lifetimes, version reporting and the restart boundary.
 
 The application ships its own standalone plugin. Explicitly install or restore it after configuring drawing roots:
 

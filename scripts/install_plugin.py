@@ -35,6 +35,7 @@ def prepare(repo: Path, config: Path | None = None, *, frontend="legacy", host_s
         "command": str(python),
         "args": ["-m", "autocad_mcp", "--config", str(config), "serve"],
         "cwd": str(repo),
+        "env": {"AUTOCAD_MCP_PLUGIN_VERSION": json.loads((template / "plugin.json").read_bytes())["version"]},
     }
     if frontend == "framework":
         if host_state is None or not (host_state / "autocad-application.json").is_file():

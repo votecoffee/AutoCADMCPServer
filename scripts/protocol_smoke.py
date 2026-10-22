@@ -4,15 +4,18 @@ import argparse
 import asyncio
 import json
 import sys
+import tempfile
 from pathlib import Path
 
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
 
-async def run(config, root, project_id=None):
+async def run(config, root, project_id=None, *, management_registry):
     parameters = StdioServerParameters(
-        command=sys.executable, args=["-m", "autocad_mcp", "--config", str(Path(config).resolve()), "serve"]
+        command=sys.executable,
+        args=["-m", "autocad_mcp", "--config", str(Path(config).resolve()), "serve"],
+        env={"AUTOCAD_MCP_MANAGEMENT_REGISTRY": str(management_registry)},
     )
     async with stdio_client(parameters) as (read, write):
         async with ClientSession(read, write, read_timeout_seconds=180.0) as session:
@@ -65,4 +68,5 @@ if __name__ == "__main__":
     parser.add_argument("--root", required=True)
     parser.add_argument("--project-id", help="Also exercise electrical reads and app-owned JSON export")
     args = parser.parse_args()
-    asyncio.run(run(args.config, args.root, args.project_id))
+    with tempfile.TemporaryDirectory(prefix="autocad-management-") as registry:
+        asyncio.run(run(args.config, args.root, args.project_id, management_registry=registry))

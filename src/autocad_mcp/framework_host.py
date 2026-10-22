@@ -15,7 +15,7 @@ from . import __version__
 from .config import Config, inside
 from .integration import HIGHLIGHT, OFFLINE_WRITES
 
-FRAMEWORK_VERSION = "0.17.0"
+FRAMEWORK_VERSION = "0.18.0"
 HOST_INSTRUCTIONS = (
     "AutoCAD MCP Server app-owned framework host. Use search_tools, then describe_service and "
     "describe_tool for drawing-engine/cad_get_workflow. Read that tool's current app workflow "
@@ -203,16 +203,29 @@ def create_host(state: Path, publication: Path, config_path: Path, **kwargs):
                 ) from error
             return await super().refresh()
 
-    return DrawingHost(state, publication, **kwargs)
+    from .management import Activity
+
+    host = DrawingHost(state, publication, **kwargs)
+    host.management_activity = Activity()
+    invoke = host.backend.invoke
+
+    async def observed(name, arguments, *, relay=None):
+        with host.management_activity.operation():
+            return await invoke(name, arguments, relay=relay)
+
+    host.backend.invoke = observed
+    return host
 
 
-def serve(state: Path, publication: Path, config_path: Path):
+def serve(state: Path, publication: Path, config_path: Path, *, registry=None):
     import secrets
 
     import uvicorn
     from starlette.applications import Starlette
     from universal_tools.daemon import ProtectedApp
     from universal_tools.models import load_settings
+
+    from .management import Reporting
 
     state = state.resolve(strict=True)
     settings = load_settings(state)
@@ -225,7 +238,8 @@ def serve(state: Path, publication: Path, config_path: Path):
     @asynccontextmanager
     async def lifespan(_):
         async with host, server.session_manager.run():
-            yield
+            with Reporting(host.management_activity.status, registry=registry):
+                yield
 
     app = Starlette(routes=base.routes, lifespan=lifespan)
     runtime = uvicorn.Config(

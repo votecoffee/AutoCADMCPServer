@@ -29,6 +29,10 @@ def test_plugin_binding_is_local_independent_and_relocatable(tmp_path):
     manifest = json.loads((package / "plugin.json").read_text(encoding="utf-8"))
     assert manifest["name"] == "autocad"
     servers = json.loads((package / "mcp.json").read_text(encoding="utf-8"))["mcpServers"]
+    assert (
+        servers["autocad"]["env"]["AUTOCAD_MCP_PLUGIN_VERSION"]
+        == json.loads((template / "plugin.json").read_bytes())["version"]
+    )
     assert set(servers) == {"autocad"}
     assert servers["autocad"]["command"] == str(python)
     assert servers["autocad"]["args"] == ["-m", "autocad_mcp", "--config", str(config), "serve"]
