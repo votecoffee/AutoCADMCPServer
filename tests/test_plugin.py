@@ -3,6 +3,7 @@ import shutil
 from pathlib import Path
 
 from autocad_mcp import __display_version__, __version__
+from autocad_mcp.profile import NUMERICAL_ENVIRONMENT
 from scripts.install_plugin import FILES, prepare
 
 
@@ -40,6 +41,7 @@ def test_plugin_binding_is_local_independent_and_relocatable(tmp_path):
     )
     assert set(servers) == {"autocad"}
     assert servers["autocad"]["env"]["AUTOCAD_MCP_EXECUTION_PROFILE"] == "offline"
+    assert all(servers["autocad"]["env"][name] == "1" for name in NUMERICAL_ENVIRONMENT)
     assert servers["autocad"]["env"]["AUTOCAD_MCP_PLUGIN_DISPLAY_VERSION"] == __display_version__
     assert servers["autocad"]["command"] == str(python)
     assert servers["autocad"]["args"] == ["-m", "autocad_mcp", "--config", str(config), "serve"]

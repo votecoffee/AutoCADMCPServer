@@ -1,5 +1,7 @@
 # Verification
 
+The offline profile regression includes a real NumPy-only private helper: request two numerical threads before importing the app, then verify package bootstrap limits the actual OpenBLAS pool to one before numerical initialization. This starts no MCP or native engineering application. Retain per-process private commit, working set, thread counts, exact library hashes and bounded job metrics when investigating numerical startup allocation; an exception label alone is insufficient.
+
 The selected source gate is [standalone offline](docs/offline-profile.md). Run `tests/test_offline_profile.py` for default/config/environment refusal, absent ODA discovery, native worker/tool refusal before side effects, and accurate capability/status scope. Native COM tests bypass only the release gate under explicit mocks to retain legacy preservation checks; they do not enable that route. Use synthetic library fixtures and harmless private Python jobs only while runtime activation is held. Real MCP tests wait for the app's explicit canary release.
 
 Run `python scripts/release_version.py` and `python -m pytest tests/test_version.py -q` to verify the fixed timestamp, canonical Python/plugin identities and semantic comparisons. Build the app wheel with `uv build --wheel --out-dir ABSOLUTE_PRIVATE_DIRECTORY`; verify its METADATA version and import the built wheel in an isolated Python process without starting MCP. Inspect both generated plugin manifests and their binding versions using disposable configuration only. See [release versions](docs/versioning.md).

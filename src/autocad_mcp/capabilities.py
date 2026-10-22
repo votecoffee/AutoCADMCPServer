@@ -11,6 +11,7 @@ def report(backend=False):
         "display_version": __display_version__,
         "version_timezone": VERSION_TIMEZONE,
         "execution_profile": "offline",
+        "numerical_threads_per_process": 1,
         "native_operations_available": False,
         "available_formats": [".dxf", ".pdf"],
         "blocked_formats": [".dwg", ".dwt", ".dws"],

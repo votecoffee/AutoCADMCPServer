@@ -1,6 +1,6 @@
 {
   "name": "autocad",
-  "version": "26.1022.180516",
+  "version": "26.1022.184511",
   "description": "Extract and trace local CAD and Electrical drawing evidence with AutoCAD MCP Server.",
   "author": {
     "name": "votecoffee"

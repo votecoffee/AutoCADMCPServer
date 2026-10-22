@@ -4,6 +4,24 @@ import os
 
 PROFILE = "offline"
 NATIVE_BLOCKER = "Native engineering operations are unavailable in the standalone offline profile"
+NUMERICAL_ENVIRONMENT = {
+    name: "1"
+    for name in (
+        "OPENBLAS_NUM_THREADS",
+        "GOTO_NUM_THREADS",
+        "OMP_NUM_THREADS",
+        "OMP_THREAD_LIMIT",
+        "MKL_NUM_THREADS",
+        "BLIS_NUM_THREADS",
+        "VECLIB_MAXIMUM_THREADS",
+        "NUMEXPR_NUM_THREADS",
+    )
+}
+
+
+def configure_runtime():
+    """Bound native numerical pools before ezdxf/NumPy imports in every app entrypoint."""
+    os.environ.update(NUMERICAL_ENVIRONMENT)
 
 
 def validate_profile(profile="offline", oda_executable=None):

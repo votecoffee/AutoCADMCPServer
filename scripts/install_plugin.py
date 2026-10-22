@@ -29,6 +29,7 @@ def prepare(repo: Path, config: Path | None = None, *, frontend="legacy", host_s
         raise ValueError("Run InstallAndRun.cmd --install-only first")
     from autocad_mcp import __display_version__, __version__
     from autocad_mcp.config import Config
+    from autocad_mcp.profile import NUMERICAL_ENVIRONMENT
 
     Config.load(config)
     for name in ("plugin.json", ".codex-plugin/plugin.json"):
@@ -40,6 +41,7 @@ def prepare(repo: Path, config: Path | None = None, *, frontend="legacy", host_s
         "args": ["-m", "autocad_mcp", "--config", str(config), "serve"],
         "cwd": str(repo),
         "env": {
+            **NUMERICAL_ENVIRONMENT,
             "AUTOCAD_MCP_EXECUTION_PROFILE": "offline",
             "AUTOCAD_MCP_PLUGIN_VERSION": __version__,
             "AUTOCAD_MCP_PLUGIN_DISPLAY_VERSION": __display_version__,

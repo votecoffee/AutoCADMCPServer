@@ -13,9 +13,11 @@ DWG/DWT/DWS extraction and AutoCAD highlighting are unavailable in this release.
 
 Do not rewrite an installed configuration to adopt this release automatically. Prepare a separate explicit offline configuration and immutable package for a staged canary. Installation/activation needs its own release authorization.
 
+Numerical library pools are fixed at one thread per process by package bootstrap before ezdxf/NumPy imports. Generated plugin environments also set OpenBLAS/OpenMP/MKL/BLIS/NumExpr/vecLib thread limits to one. These values override ambient numerical-pool settings; they are separate from the bounded MCP request and Python worker counts. Programmatic embedding that initializes numerical libraries before importing this package is outside the direct standalone startup contract.
+
 ## Enabled launch and ownership scope
 
-The standalone binding uses the app Python executable directly, with no shell. Codex owns the front-door launch and any Windows venv redirector; the running Python server is the actual durable supervisor of app-created children. The app never substitutes a temporary registration helper as owner. Server admission, captured-parent identity and non-consuming stdio EOF fences are in `lifetime.py`. Actual installed transport/redirector behavior needs a disposable MCP canary.
+The standalone binding uses the app Python executable directly, with no shell. Windows/Python/SDK launches can also create private OS console helpers; include their exact identities in job accounting and cleanup proof. They do not become drawing-worker supervisors. Codex owns the front-door launch and any Windows venv redirector; the running Python server is the actual durable supervisor of app-created children. The app never substitutes a temporary registration helper as owner. Server admission, captured-parent identity and non-consuming stdio EOF fences are in `lifetime.py`. Actual installed transport/redirector behavior needs a disposable MCP canary.
 
 Extraction, render and table workers are private Python trees created in suspended Windows jobs, reserved durably before launch, bound to exact host/PID/creation/image identities before resume, and limited to eight processes per tree. The existing request, server, worker and job quotas also apply. No native converter or highlighting worker is reachable in this profile. Python libraries render to files without launching a viewer. Worker input is fixed app argv/files; stdin is disconnected and diagnostics are bounded.
 

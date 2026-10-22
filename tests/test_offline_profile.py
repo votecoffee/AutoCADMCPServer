@@ -1,6 +1,8 @@
 """Offline gates use disposable files and stubs, with no MCP/native process startup."""
 
 import json
+import os
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -9,6 +11,8 @@ import pytest
 from autocad_mcp import autocad, electrical_server, extract
 from autocad_mcp.capabilities import report
 from autocad_mcp.config import Config
+from autocad_mcp.owned_process import run_owned
+from autocad_mcp.profile import NUMERICAL_ENVIRONMENT, configure_runtime
 from autocad_mcp.service import DrawingService
 
 
@@ -115,3 +119,40 @@ def test_status_and_capabilities_report_the_effective_profile(tmp_path):
     assert status["supported_extensions"] == report()["available_formats"]
     assert status["blocked_extensions"] == report()["blocked_formats"]
     assert not status["native_operations_available"] and not status["oda_available"]
+    assert status["numerical_threads_per_process"] == report()["numerical_threads_per_process"] == 1
+
+
+def test_numerical_pool_limits_override_ambient_values_without_an_enabling_flag(monkeypatch):
+    import os
+
+    for name in NUMERICAL_ENVIRONMENT:
+        monkeypatch.setenv(name, "256")
+    configure_runtime()
+    assert all(os.environ[name] == "1" for name in NUMERICAL_ENVIRONMENT)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Selected Windows numerical DLL regression")
+def test_package_bootstrap_bounds_the_actual_numpy_pool_before_library_initialization():
+    # A separate owned Python helper starts with two numerical threads requested.
+    # No MCP or drawing/native engineering operation is started by this fixture.
+    script = """
+import ctypes,json,os,re
+from pathlib import Path
+for name in ('OPENBLAS_NUM_THREADS','GOTO_NUM_THREADS','OMP_NUM_THREADS','OMP_THREAD_LIMIT','MKL_NUM_THREADS','BLIS_NUM_THREADS','VECLIB_MAXIMUM_THREADS','NUMEXPR_NUM_THREADS'):
+    os.environ[name]='2'
+import autocad_mcp
+import numpy as np
+observed=[]
+for dll in (Path(np.__file__).parent.parent/'numpy.libs').glob('*.dll'):
+    for symbol in set(re.findall(rb'[A-Za-z_0-9]*openblas_get_num_threads[A-Za-z_0-9]*',dll.read_bytes())):
+        try: function=getattr(ctypes.CDLL(str(dll)),symbol.decode())
+        except AttributeError: continue
+        function.argtypes=[];function.restype=ctypes.c_int
+        observed.append(function())
+values=np.ones((64,64))
+assert (values@values)[0,0]==64
+print(json.dumps({'actual_numerical_threads':observed}))
+"""
+    result = run_owned([sys.executable, "-c", script], timeout=20, check=True, capture_limit=4096)
+    threads = json.loads(result.stdout)["actual_numerical_threads"]
+    assert threads and set(threads) == {1}

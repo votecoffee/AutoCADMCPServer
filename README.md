@@ -8,7 +8,9 @@ Extract drawing information through a shared Python service, command line interf
 
 The selected profile is **direct standalone offline** on Windows: local PDF/DXF and Electrical report analysis. Native DWG/DWT/DWS conversion and AutoCAD highlighting are refused by code, configuration and environment gates. See [offline profile and launch scope](docs/offline-profile.md).
 
-Current source release: **26.1022.180516**, stamped once in `America/New_York`. The app and both plugin manifests share the canonical package version `26.1022.180516`. [Versioning](docs/versioning.md) explains padded display timestamps, leading-zero normalization and release checks. Framework `0.20.0` and MCP SDK `2.3.0` remain independently pinned. Source/package verification does not establish installed or native acceptance.
+Numerical libraries are limited to one numerical thread per app/worker process before imports. The standalone binding supplies the same bounds, preventing ambient library thread settings from expanding the offline process budget. This does not replace request/worker limits or establish a hard per-process RSS quota.
+
+Current source release: **26.1022.184511**, stamped once in `America/New_York`. The app and both plugin manifests share the canonical package version `26.1022.184511`. [Versioning](docs/versioning.md) explains padded display timestamps, leading-zero normalization and release checks. Framework `0.20.0` and MCP SDK `2.3.0` remain independently pinned. Source/package verification does not establish installed or native acceptance.
 
 ## Table of Contents
 

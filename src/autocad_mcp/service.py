@@ -128,6 +128,7 @@ class DrawingService:
             "version": __version__,
             "display_version": __display_version__,
             "execution_profile": self.config.execution_profile,
+            "numerical_threads_per_process": 1,
             "native_operations_available": False,
             "blocked_extensions": [".dwg", ".dwt", ".dws"],
             "roots": {k: str(v) for k, v in self.config.roots.items()},
