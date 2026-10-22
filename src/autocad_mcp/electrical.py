@@ -767,6 +767,10 @@ class ElectricalService:
         return {
             "project_id": project_id,
             "path": str(destination),
+            "authorization": {
+                "root_id": snapshot["root_id"],
+                "root_path": str(self.config.roots[snapshot["root_id"]]),
+            },
             "sha256": sha256(destination),
             "size_bytes": destination.stat().st_size,
             "freshness": value["export_freshness"],

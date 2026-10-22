@@ -302,18 +302,24 @@ class DrawingService:
             "next_start": start + length if start + length < len(text) else None,
         }
 
-    def index(self, root_id: str, offset=0, limit=2) -> dict:
+    def index(
+        self, root_id: str, offset=0, limit=2, *, progress=None, cancelled=None, selection=None
+    ) -> dict:
         if not 1 <= limit <= 5:
             raise ValueError("Index batches contain 1..5 files; follow next_offset")
-        batch = self.inventory(root_id, True, offset, limit)
+        batch = selection if selection is not None else self.inventory(root_id, True, offset, limit)
         results = []
         started = time.monotonic()
+        if progress:
+            progress(0, len(batch["items"]), "indexing")
         for file in batch["items"]:
+            if cancelled and cancelled():
+                break
             if results and time.monotonic() - started > 150:
                 break
             relative_path = file["relative_path"]
             try:
-                doc = self._index_file(root_id, relative_path)
+                doc = self._index_file(root_id, relative_path, expected_sha256=file.get("sha256"))
                 results.append(
                     {
                         "path": relative_path,
@@ -324,17 +330,26 @@ class DrawingService:
                 )
             except (ValueError, OSError, RuntimeError, KeyError) as error:
                 results.append({"path": relative_path, "status": "failed", "error": str(error)[:3000]})
+            if progress:
+                progress(len(results), len(batch["items"]), "files_examined")
         return {
             "root_id": root_id,
+            **(
+                {"cancelled": len(results) < len(batch["items"]) and bool(cancelled())}
+                if cancelled is not None
+                else {}
+            ),
             "results": results,
             "total_files": batch["total"],
             "next_offset": offset + len(results) if offset + len(results) < batch["total"] else None,
         }
 
-    def _index_file(self, root_id, relative_path):
+    def _index_file(self, root_id, relative_path, *, expected_sha256=None):
         path = self.config.resolve(root_id, relative_path)
         with self.coordinator.lock("index:" + root_id + ":" + str(path)):
             doc = self.load(root_id, relative_path)
+            if expected_sha256 is not None and doc["source"]["sha256"] != expected_sha256:
+                raise ValueError("Source changed since job submission; previous index preserved")
             with self.database() as db:
                 db.execute("BEGIN IMMEDIATE")
                 db.execute("DELETE FROM records WHERE root=? AND path=?", (root_id, relative_path))
@@ -494,6 +509,7 @@ class DrawingService:
         return {
             "source": source_doc["source"],
             "preview_path": str(target),
+            "authorization": {"root_id": root_id, "root_path": str(self.config.roots[root_id])},
             "sha256": sha256(target),
             "page": page if source_doc["format"] == "pdf" else None,
             "layout": layout if source_doc["format"] == "cad" else None,

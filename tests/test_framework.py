@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 import shutil
 import socket
@@ -16,10 +17,10 @@ from universal_tools.transport import http_session
 
 from autocad_mcp import framework_host
 from autocad_mcp.framework_entry import verify_deployment
-from autocad_mcp.guidance import WORKFLOW
 from autocad_mcp.integration import OFFLINE_WRITES
 from autocad_mcp.server import create_server
 from autocad_mcp.transactions import Transactions
+from autocad_mcp.workflow_guidance import Guidance
 
 FRONT_DOOR = {
     "broker_status",
@@ -42,6 +43,11 @@ FRONT_DOOR = {
 def data(result):
     assert not result.is_error, result.content
     return result.structured_content or json.loads(result.content[0].text)
+
+
+def resource_text(result):
+    value = result.contents[0]
+    return value.text if hasattr(value, "text") else base64.b64decode(value.blob).decode()
 
 
 def free_port():
@@ -67,6 +73,57 @@ def add_fixture_tool(package):
     text = server.read_text(encoding="utf-8")
     added = '\n    @tool()\n    def cad_fixture_marker() -> dict:\n        """Disposable backend revision marker."""\n        return {"generation": 2}\n'
     server.write_text(text.replace("    return mcp\n", added + "    return mcp\n"), encoding="utf-8")
+
+
+@pytest.mark.anyio
+async def test_explicit_retained_modern_profile_results_latency_and_skill_methods(
+    drawing_service, tmp_path, record_property
+):
+    from mcp import Client
+    from mcp.types import Request, RequestParams
+    from universal_tools.skill_catalog import SkillList
+    from universal_tools.skill_client import SkillClient
+
+    service, source = drawing_service
+    config = source.parent / "config.json"
+    samples = {}
+    expected = service.inspect("test", "sample.dxf")
+    before_source = (source / "sample.dxf").read_bytes()
+    for profile in ("transient-legacy", "retained-modern"):
+        state = tmp_path / profile
+        prepared = framework_host.prepare(config, state, port=free_port(), discovery_profile=profile)
+        if profile == "retained-modern":
+            with pytest.raises(ValueError, match="dedicated"):
+                framework_host.prepare(config, state)
+        async with framework_host.create_host(state, Path(prepared["publication"]), config) as host:
+            client = host.client()
+            description = data(
+                await client.invoke("describe_tool", {"tool_id": "drawing-engine/cad_inspect"})
+            )
+            payload = {
+                "tool_id": description["tool_id"],
+                "catalog_revision": description["catalog_revision"],
+                "arguments": {"root_id": "test", "relative_path": "sample.dxf"},
+            }
+            assert data(await client.invoke("call_read_tool", payload)) == expected
+            samples[profile] = []
+            for _ in range(3):
+                start = time.perf_counter()
+                assert data(await client.invoke("call_read_tool", payload)) == expected
+                samples[profile].append((time.perf_counter() - start) * 1000)
+            server = host.create_server(frontend_identity="a" * 32, skills=host.resource_catalog)
+            async with Client(server, mode="2026-07-28", extensions=[SkillClient()], cache=None) as native:
+                entries = await native.session.send_request(
+                    Request(method="skills/list", params=RequestParams()), SkillList
+                )
+                assert entries.skills[0]["uri"] == "skill://drawing-analysis/SKILL.md"
+                assert (
+                    "drawing-analysis"
+                    in (await native.read_resource(entries.skills[0]["uri"])).contents[0].text
+                )
+    assert max(samples["retained-modern"]) < min(samples["transient-legacy"])
+    assert (source / "sample.dxf").read_bytes() == before_source
+    record_property("profile_inspect_latency_ms", json.dumps(samples))
 
 
 @pytest.mark.anyio
@@ -97,7 +154,7 @@ async def test_real_handlers_and_results_through_framework(
                 payload["request_id"] = outer
             return await client.invoke(desc["invocation"]["channel"], payload)
 
-        assert data(await routed("cad_get_workflow", {}))["text"] == WORKFLOW
+        assert data(await routed("cad_get_workflow", {}))["text"] == Guidance().workflow()["text"]
         args = {"root_id": "test", "relative_path": "sample.dxf"}
         before = (service.config.roots["test"] / "sample.dxf").read_bytes()
         assert data(await routed("cad_inspect", args)) == service.inspect("test", "sample.dxf")
@@ -338,8 +395,8 @@ async def test_same_two_native_clients_refresh_backend_without_frontdoor_reload(
             ]
             definitions = (await clients[0].list_tools()).model_dump(mode="json", by_alias=True)
             assert {tool["name"] for tool in definitions["tools"]} == FRONT_DOOR
-            assert {str(resource.uri) for resource in (await clients[0].list_resources()).resources} == {
-                "broker://catalog"
+            assert {"broker://catalog", "skill://drawing-analysis/SKILL.md"} <= {
+                str(resource.uri) for resource in (await clients[0].list_resources()).resources
             }
             catalog = json.loads((await clients[0].read_resource("broker://catalog")).contents[0].text)
             assert set(catalog) == {"generation"}
@@ -355,6 +412,12 @@ async def test_same_two_native_clients_refresh_backend_without_frontdoor_reload(
                 "arguments": {},
             }
             original_guide = data(await clients[0].call_tool("call_read_tool", payload))
+            assert (
+                json.loads(
+                    resource_text(await clients[0].read_resource("skill://drawing-analysis/workflow.json"))
+                )
+                == original_guide
+            )
             add_fixture_tool(package)
             guidance = package / "guidance.py"
             guidance.write_text(
@@ -399,6 +462,12 @@ async def test_same_two_native_clients_refresh_backend_without_frontdoor_reload(
                         "arguments": {},
                     },
                 )
+            )
+            assert (
+                json.loads(
+                    resource_text(await clients[1].read_resource("skill://drawing-analysis/workflow.json"))
+                )
+                == updated_guide
             )
             assert updated_guide["workflow_revision"] != original_guide["workflow_revision"]
             assert "workflow fixture v2." in updated_guide["text"]

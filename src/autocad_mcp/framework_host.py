@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import importlib.metadata
 import json
@@ -41,6 +42,13 @@ def check_host_state(config: Config, state: Path):
 
 
 def check_receipts(config: Config):
+    jobs = config.state / "batch-jobs.sqlite3"
+    if jobs.exists():
+        with closing(sqlite3.connect(jobs.as_uri() + "?mode=ro", uri=True)) as db:
+            if db.execute(
+                "SELECT count(*) FROM jobs WHERE state IN ('queued','running','cancel_requested','unknown')"
+            ).fetchone()[0]:
+                raise ValueError("Reconcile active/unknown index jobs before backend publication")
     path = config.state / "requests.sqlite3"
     if not path.exists():
         return
@@ -53,7 +61,9 @@ def check_receipts(config: Config):
         )
 
 
-def prepare(config_path: Path, state: Path, *, port=8798, highlighting=False) -> dict:
+def prepare(
+    config_path: Path, state: Path, *, port=8798, highlighting=False, discovery_profile="transient-legacy"
+) -> dict:
     require_framework()
     from universal_tools.cli import initialize
     from universal_tools.framework import ApplicationDefinition
@@ -63,9 +73,25 @@ def prepare(config_path: Path, state: Path, *, port=8798, highlighting=False) ->
     config = Config.load(config_path)
     check_host_state(config, state)
     check_receipts(config)
+    if discovery_profile not in {"transient-legacy", "retained-modern"}:
+        raise ValueError("Select an explicit supported discovery profile")
+    modern = discovery_profile == "retained-modern"
+    previous = state / "autocad-application.json"
+    if previous.exists() and json.loads(previous.read_bytes())["backends"][0]["service"]["session_mode"] != (
+        "shared" if modern else "transient"
+    ):
+        raise ValueError("A different retained/ownership profile requires dedicated host state")
     package = Path(__file__).parent
     contents = {"autocad_mcp/" + p.name: p.read_bytes() for p in sorted(package.glob("*.py"))}
     contents["worker.py"] = (package / "framework_entry.py").read_bytes()
+    from .workflow_guidance import render, source_text
+
+    contents.update(
+        {
+            "guidance/" + name: raw
+            for name, raw in render(source_text(contents["autocad_mcp/guidance.py"])).items()
+        }
+    )
     dependencies = {
         name: importlib.metadata.version(name)
         for name in (
@@ -101,7 +127,7 @@ def prepare(config_path: Path, state: Path, *, port=8798, highlighting=False) ->
     if any(
         (package / Path(name).name).read_bytes() != data
         for name, data in contents.items()
-        if name != "worker.py"
+        if name.startswith("autocad_mcp/")
     ):
         raise ValueError("App source changed during publication; retry after development is quiescent")
     entry = deployment / "worker.py"
@@ -131,10 +157,10 @@ def prepare(config_path: Path, state: Path, *, port=8798, highlighting=False) ->
                         "enabled": True,
                         "allow_writes": True,
                         "allowed_write_tools": list(OFFLINE_WRITES) + ([HIGHLIGHT] if highlighting else []),
-                        "session_mode": "transient",
-                        "protocol_mode": "legacy",
-                        "discovery_cache_ttl_seconds": 0,
-                        "watch_catalog": False,
+                        "session_mode": "shared" if modern else "transient",
+                        "protocol_mode": "2026-07-28" if modern else "legacy",
+                        "discovery_cache_ttl_seconds": 2 if modern else 0,
+                        "watch_catalog": modern,
                         "max_argument_depth": 64,
                         "max_argument_nodes": 100_000,
                         "timeout_seconds": 300,
@@ -154,7 +180,7 @@ def prepare(config_path: Path, state: Path, *, port=8798, highlighting=False) ->
         "backend_revision": publication.backends[0].revision,
         "deployment": str(deployment),
         "framework_version": FRAMEWORK_VERSION,
-        "backend_tools": 32,
+        "backend_tools": 38,
         "live_migration_performed": False,
     }
 
@@ -178,6 +204,10 @@ def create_host(state: Path, publication: Path, config_path: Path, **kwargs):
     # A normal MCP result can still describe an unknown native UI outcome.
     class DrawingHost(ApplicationHost):
         async def refresh(self):
+            async with self.guidance_refresh_lock:
+                return await self.refresh_with_guidance()
+
+        async def refresh_with_guidance(self):
             try:
                 arguments = json.loads(publication.read_bytes())["backends"][0]["service"]["transport"][
                     "args"
@@ -190,6 +220,10 @@ def create_host(state: Path, publication: Path, config_path: Path, **kwargs):
                     raise ValueError("Use a new host for a different app business-state directory")
                 check_host_state(app_config, state)
                 check_receipts(app_config)
+                from .workflow_guidance import Guidance
+
+                guide_folder = Path(arguments[-2]).parent / "guidance"
+                candidate = Guidance(package=guide_folder)
             except (
                 ValueError,
                 OSError,
@@ -201,17 +235,54 @@ def create_host(state: Path, publication: Path, config_path: Path, **kwargs):
                 raise BrokerError(
                     "App deployment/receipts require local reconciliation before refresh"
                 ) from error
-            return await super().refresh()
+            result = await super().refresh()
+            # A deferred or rejected backend must keep its prior guidance publication.
+            if (
+                self._selected["drawing-engine"].revision
+                == json.loads(publication.read_bytes())["backends"][0]["revision"]
+            ):
+                import tempfile
+
+                with tempfile.TemporaryDirectory(prefix="autocad-host-guidance-") as folder:
+                    Guidance.write(Path(folder), candidate.files())
+                    await self.workflow_guidance.catalog.publish(
+                        [folder], expected_revision=self.workflow_guidance.catalog.revision
+                    )
+            return result
 
     from .management import Activity
 
     host = DrawingHost(state, publication, **kwargs)
+    from .workflow_guidance import Guidance
+
+    host.workflow_guidance = Guidance()
+    from .artifacts import Artifacts, GuidanceResources
+    from .service import DrawingService
+
+    host.artifacts = Artifacts(DrawingService(original))
+    host.resource_catalog = GuidanceResources(host.workflow_guidance.catalog, host.artifacts)
+    host.guidance_refresh_lock = asyncio.Lock()
     host.management_activity = Activity()
     invoke = host.backend.invoke
 
     async def observed(name, arguments, *, relay=None):
         with host.management_activity.operation():
-            return await invoke(name, arguments, relay=relay)
+            result = await invoke(name, arguments, relay=relay)
+            if (
+                name == "call_read_tool"
+                and arguments.get("tool_id") == "drawing-engine/cad_get_artifact"
+                and not result.is_error
+            ):
+                payload = arguments["arguments"]
+                await asyncio.to_thread(
+                    host.artifacts.describe,
+                    payload["request_id"],
+                    payload["sha256"],
+                    payload.get("offset", 0),
+                    payload.get("length", 65536),
+                )
+                await host.artifacts.changed()
+            return result
 
     host.backend.invoke = observed
     return host
@@ -232,7 +303,7 @@ def serve(state: Path, publication: Path, config_path: Path, *, registry=None):
     host = create_host(
         state, publication, config_path, max_request_body_bytes=settings.max_request_body_bytes
     )
-    server = host.create_server(port=settings.port)
+    server = host.create_server(port=settings.port, skills=host.resource_catalog)
     base = server.streamable_http_app(**server.http_options)
 
     @asynccontextmanager

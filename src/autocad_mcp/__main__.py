@@ -29,7 +29,9 @@ def main():
         "--management-registry", help="Explicit private tray registry for isolated deployments"
     )
     serve.add_argument(
-        "--workflow", action="store_true", help="Expose the backend's versioned workflow read tool"
+        "--workflow",
+        action="store_true",
+        help="Run as an app-host backend without manager registration or job ownership",
     )
     prepare = sub.add_parser(
         "framework-prepare", help="Publish a private, immutable backend for the app-owned framework host"
@@ -37,6 +39,9 @@ def main():
     prepare.add_argument("--host-state", required=True)
     prepare.add_argument("--port", type=int, default=8798)
     prepare.add_argument("--include-highlighting", action="store_true")
+    prepare.add_argument(
+        "--discovery-profile", choices=["transient-legacy", "retained-modern"], default="transient-legacy"
+    )
     host = sub.add_parser("framework-serve", help="Run the authenticated app-owned host; no universal daemon")
     host.add_argument("--host-state", required=True)
     host.add_argument("--publication")
@@ -91,7 +96,11 @@ def main():
         state = Path(args.host_state)
         if args.command == "framework-prepare":
             result = framework_host.prepare(
-                Path(args.config), state, port=args.port, highlighting=args.include_highlighting
+                Path(args.config),
+                state,
+                port=args.port,
+                highlighting=args.include_highlighting,
+                discovery_profile=args.discovery_profile,
             )
             print(json.dumps(result))
         elif args.command == "framework-serve":
@@ -120,7 +129,12 @@ def main():
         if not args.workflow:
             from .management import Reporting
 
-            reporting = Reporting(scheduler.status, registry=args.management_registry)
+            def activity():
+                value = scheduler.status()
+                value["active"] += service.batch_jobs.activity()
+                return value
+
+            reporting = Reporting(activity, registry=args.management_registry)
         with reporting:
             if args.transport == "stdio" or not SDK2:
                 server.run(transport=args.transport)

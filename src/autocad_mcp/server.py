@@ -2,40 +2,64 @@ from __future__ import annotations
 
 import inspect
 import json
-from functools import wraps
+from functools import partial, wraps
 from typing import Any
 
+import anyio
+from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
-
-try:
-    from mcp.server import MCPServer
-
-    SDK2 = True
-except ImportError:
-    # Keep existing editable 0.3 installations usable until their explicit runtime upgrade.
-    from mcp.server.fastmcp import FastMCP as MCPServer
-
-    SDK2 = False
+from universal_tools.extensions import ExtensionServer as MCPServer
 
 from . import __version__
+from .artifacts import Artifacts
+from .batch_jobs import BatchJobs
 from .coordination import RequestScheduler
-from .guidance import WORKFLOW
 from .service import DrawingService
 from .transactions import Transactions
+from .workflow_guidance import BOOTSTRAP, Guidance
+
+
+class DrawingServer(MCPServer):
+    """Private, short-lived modern discovery hints; legacy clients retain explicit refresh."""
+
+    async def _handle_list_tools(self, ctx, params):
+        self.discovery_round_trips["tools"] += 1
+        result = await super()._handle_list_tools(ctx, params)
+        return (
+            result.model_copy(update={"ttl_ms": 2000, "cache_scope": "private"})
+            if ctx.protocol_version == "2026-07-28"
+            else result
+        )
+
+    async def _handle_list_resources(self, ctx, params):
+        self.discovery_round_trips["resources"] += 1
+        result = await super()._handle_list_resources(ctx, params)
+        return (
+            result.model_copy(update={"ttl_ms": 2000, "cache_scope": "private"})
+            if ctx.protocol_version == "2026-07-28"
+            else result
+        )
 
 
 def create_server(
-    service: DrawingService, port: int = 8796, *, workflow: bool = False, scheduler=None
+    service: DrawingService, port: int = 8796, *, workflow: bool = False, scheduler=None, guidance=None
 ) -> MCPServer:
     scheduler = scheduler or RequestScheduler(
         service.config.max_concurrent_requests, service.config.max_queued_requests
     )
     transactions = Transactions(service.config.state, service.coordinator)
-    mcp = MCPServer(
+    guidance = guidance or Guidance()
+    artifacts = Artifacts(service)
+    jobs = BatchJobs(service)
+    service.batch_jobs = jobs
+    mcp = DrawingServer(
         "AutoCAD MCP Server",
-        instructions=WORKFLOW,
-        **({"version": __version__} if SDK2 else {"host": "127.0.0.1", "port": port}),
+        instructions=BOOTSTRAP,
+        extensions=[guidance.catalog],
+        resource_providers=[guidance.catalog, artifacts],
+        version=__version__,
     )
+    mcp.discovery_round_trips = {"tools": 0, "resources": 0}
 
     def tool(*, read=True, control=False):
         def decorate(fn):
@@ -55,8 +79,15 @@ def create_server(
                     result = await scheduler.run(execute, control=control)
                 else:
                     result = await scheduler.run(
-                        transactions.execute, request_id, fn.__name__, dict(bound.arguments), execute
+                        transactions.execute,
+                        request_id,
+                        fn.__name__,
+                        {key: value for key, value in bound.arguments.items() if key != "ctx"},
+                        execute,
+                        control=control,
                     )
+                if fn.__name__ == "cad_get_artifact":
+                    await artifacts.changed()
                 if len(json.dumps(result, ensure_ascii=False).encode("utf-8")) > 200_000:
                     raise ValueError("Response exceeds budget; use smaller limit or narrower filters")
                 return result
@@ -90,21 +121,50 @@ def create_server(
 
         return decorate
 
-    if workflow:
+    @tool(control=True)
+    def cad_get_workflow(expected_revision: str | None = None) -> dict:
+        """Read current drawing workflow and the revision/hash-pinned reference catalog."""
+        return guidance.workflow(expected_revision)
 
-        @tool(control=True)
-        def cad_get_workflow() -> dict:
-            """Read current app-owned drawing workflow, source boundaries and request recovery guidance."""
-            import hashlib
+    @tool(control=True)
+    def cad_get_workflow_reference(reference_id: str, workflow_revision: str, sha256: str) -> dict:
+        """Read a named supporting reference using its exact current guide revision and SHA-256."""
+        return guidance.reference(reference_id, workflow_revision, sha256)
 
-            from . import __version__
+    @tool(control=True)
+    def cad_capabilities() -> dict:
+        """Read feature/doctor status, selected profile, implementation evidence and concrete blockers."""
+        from .capabilities import report
 
-            return {
-                "schema_version": 1,
-                "app_version": __version__,
-                "workflow_revision": hashlib.sha256(WORKFLOW.encode()).hexdigest(),
-                "text": WORKFLOW,
-            }
+        return {**report(workflow), "discovery_round_trips": dict(mcp.discovery_round_trips)}
+
+    @tool(read=False)
+    def cad_start_index_job(root_id: str, offset: int = 0, limit: int = 5) -> dict:
+        """Start one durable-intent index batch on a long-lived direct owner. Keep its capability private."""
+        if workflow:
+            raise ValueError(
+                "Start index jobs on an explicitly selected long-lived direct service; backend worker survival is unassessed"
+            )
+        return jobs.start(root_id, offset, limit)
+
+    @tool(control=True)
+    def cad_get_index_job(job_id: str, access_token: str, ctx: Context) -> dict:
+        """Read authorized batch status/progress. An abandoned owner is unknown, never restarted."""
+        value = jobs.get(job_id, access_token)
+        anyio.from_thread.run(
+            partial(ctx.report_progress, value["completed"], value["total"] or None, value["stage"])
+        )
+        return value
+
+    @tool(read=False, control=True)
+    def cad_cancel_index_job(job_id: str, access_token: str) -> dict:
+        """Request a cooperative stop between files. Acknowledgment does not prove native stop or rollback."""
+        return jobs.cancel(job_id, access_token)
+
+    @tool()
+    def cad_get_artifact(request_id: str, sha256: str, offset: int = 0, length: int = 65536) -> dict:
+        """Read a hash-pinned preview/export chunk from its completed app receipt; URI and base64 fallback."""
+        return artifacts.describe(request_id, sha256, offset, length)
 
     @tool(control=True)
     def cad_status() -> dict:
@@ -251,12 +311,19 @@ def create_server(
         return service.pdf_tables(root_id, relative_path, page, offset, limit)
 
     @tool(read=False)
-    def cad_index_project(root_id: str, offset: int = 0, limit: int = 2) -> dict:
+    def cad_index_project(root_id: str, ctx: Context, offset: int = 0, limit: int = 2) -> dict:
         """Index 1..5 files into app-owned search state. Continue next_offset until null; inspect failures.
 
         This writes only the server's cache/index and preserves all source files.
         """
-        return service.index(root_id, offset, limit)
+
+        def progress(completed, total, stage):
+            try:
+                anyio.from_thread.run(partial(ctx.report_progress, completed, total, stage))
+            except Exception:
+                pass  # A lost progress recipient does not cancel or roll back committed indexing.
+
+        return service.index(root_id, offset, limit, progress=progress)
 
     @tool()
     def cad_search_project(root_id: str, query: str, offset: int = 0, limit: int = 50) -> dict:

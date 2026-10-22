@@ -21,7 +21,7 @@ async def run(config, root, project_id=None, *, management_registry):
         async with ClientSession(read, write, read_timeout_seconds=180.0) as session:
             initialized = await session.initialize()
             tools = (await session.list_tools()).tools
-            assert len(tools) == 31
+            assert len(tools) == 38
             status = await session.call_tool("cad_status", {})
             assert not status.is_error
             inventory = await session.call_tool("cad_list_files", {"root_id": root, "limit": 1})
