@@ -53,30 +53,58 @@ def parent_lifetime(*, stdio=False):
             if stdio:
                 candidate = msvcrt.get_osfhandle(sys.stdin.fileno())
                 if file_type(candidate) == 3:  # FILE_TYPE_PIPE; never consume protocol bytes.
-                    pipe = candidate
+                    # SDK 2.3 claims fd 0 and diverts the CRT descriptor to NUL.
+                    # Retain our own non-inherited wire handle before that claim;
+                    # a borrowed CRT handle would become invalid or be recycled.
+                    current = win32api.GetCurrentProcess()
+                    pipe = win32api.DuplicateHandle(current, candidate, current, 0, False, 2)
         except BaseException:
+            if pipe is not None:
+                pipe.Close()
             parent.Close()
             raise
 
-    def watch():
+    def lost_owner():
+        if not stop.wait(3):
+            # Only this server exits; kernel jobs close and interrupted intent
+            # stays uncertain. A native/user-owned process is never targeted.
+            os._exit(70)
+
+    def watch_parent():
         while not stop.wait(0.25):
             lost = wait(int(parent), 0) != 258 if parent is not None else os.getppid() != parent_pid
-            if pipe is not None and not peek(pipe, None, 0, None, None, None):
-                lost = lost or ctypes.get_last_error() in {6, 109, 232, 233}
             if lost:
-                if not stop.wait(3):
-                    # Kernel job handles close on exit; durable in-flight intent
-                    # remains uncertain for later inspection, never auto-replayed.
-                    os._exit(70)
+                lost_owner()
                 return
 
-    thread = threading.Thread(target=watch, name="autocad-owner-watch", daemon=True)
+    def watch_pipe():
+        # A synchronous pipe query can wait behind a reader. It must never block
+        # the independent parent-loss watcher, including an inherited writer.
+        while not stop.wait(0.25):
+            if not peek(int(pipe), None, 0, None, None, None) and ctypes.get_last_error() in {
+                6,
+                109,
+                232,
+                233,
+            }:
+                lost_owner()
+                return
+
+    threads = [threading.Thread(target=watch_parent, name="autocad-owner-watch", daemon=True)]
+    if pipe is not None:
+        threads.append(threading.Thread(target=watch_pipe, name="autocad-stdin-watch", daemon=True))
+    started = []
     try:
-        thread.start()
+        for thread in threads:
+            thread.start()
+            started.append(thread)
         yield
     finally:
         stop.set()
-        thread.join(timeout=1)
+        for thread in started:
+            thread.join(timeout=1)
+        if pipe is not None:
+            pipe.Close()
         if parent is not None:
             parent.Close()
 
