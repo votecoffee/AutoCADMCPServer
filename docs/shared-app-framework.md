@@ -1,5 +1,12 @@
 # Shared app framework integration
 
+The upstream [CodexMCPBroker repository](https://github.com/votecoffee/CodexMCPBroker)
+supplies the shared framework and a separate Windows MCP Service Manager application.
+AutoCAD consumes the package in its own runtime and keeps its standalone MCP server,
+app-owned Codex plugin and skills. There is no universal Codex plugin or broker route.
+See the [implementation](implementation.md) and [developer](development.md) guides for
+the current direct-service architecture, fixture checks and publication rules.
+
 AutoCAD pins `universal-codex-tools==0.20.0` at commit `5b2cac50ca24d21a15b732e0424bb02fd794e1fb`, retaining **MCP Python SDK 2.3.0**. Shared code now supplies durable resource ownership to the direct server. AutoCAD keeps its independent application, CLI, native endpoint, plugin and skills. The experimental `ApplicationHost` remains a source prototype: **host/proxy CLI deployment is blocked** until its SDK stdio launch path has an app-owned ownership/containment adapter. The shared background launcher cannot replace MCP stdio. No route is changed automatically.
 
 ```mermaid
@@ -13,7 +20,7 @@ flowchart LR
     S --> D[Preserved drawing snapshots]
 ```
 
-The front door uses the framework's existing search, description, invocation, receipt and session schemas. Its historical `broker_status` tool describes this app host. The source exposes 38 definitions on both `drawing-engine` and direct `serve`, retaining the original 31 and adding guide/reference, capability, job and artifact tools. Backend job starts are rejected and job mutations remain outside the host write allowlist. Existing handler schemas, structured results, source checks and durable app receipts remain authoritative.
+The experimental app-host front door uses the framework's existing search, description, invocation, receipt and session schemas. Its historical `broker_status` tool describes this prototype app host. The source exposes 38 definitions on both `drawing-engine` and direct `serve`, retaining the original 31 and adding guide/reference, capability, job and artifact tools. Backend job starts are rejected and job mutations remain outside the host write allowlist. Existing handler schemas, structured results, source checks and durable app receipts remain authoritative.
 
 ## Dependency and packaging
 

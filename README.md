@@ -4,15 +4,15 @@
 
 Source-preserving local DWG, DXF, PDF and AutoCAD Electrical information extraction for MCP
 
-Extract drawing information through a shared Python service, command line interface and Model Context Protocol server. Device and PLC I/O inventories, connection tracing, equipment grouping, documented network inventory, consistency checks, revision comparison and JSON exports retain source evidence. Current guidance, bounded index jobs/artifacts and durable ownership of private worker trees retain AutoCAD's independent plugin and native endpoint. Experimental app-host deployment is blocked pending its SDK stdio ownership adapter. Native report assertions, observed attributes and interpretation stay distinct. Sources are preserved; native highlighting is unavailable in the offline profile. The repository is named `AutoCADMCPServer`; the Python distribution is `autocad-mcp-server`.
+Extract drawing information through a shared Python service, command line interface and standalone Model Context Protocol server. Device and PLC I/O inventories, connection tracing, equipment grouping, documented network inventory, consistency checks, revision comparison and JSON exports retain source evidence. Native report assertions, observed attributes and interpretation stay distinct. The repository is named `AutoCADMCPServer`; the Python distribution is `autocad-mcp-server`.
+
+AutoCAD owns its **standalone server, Codex plugin and drawing-analysis skill**. [CodexMCPBroker](https://github.com/votecoffee/CodexMCPBroker) supplies the pinned shared Python framework and a **separate Windows management application**. AutoCAD does not route through a broker or install a universal plugin. Its installer does not install or start the manager.
 
 The default is **direct standalone offline** on Windows: local PDF/DXF and Electrical report analysis. A separate explicit [oda-read candidate](docs/oda-read.md) restores contained DWG/DWT/DWS structural conversion and previews with a pinned operator-installed ODA executable. Source/package preparation leaves an accepted offline installation unchanged. AutoCAD COM attachment/highlighting remains unavailable. See [offline profile and launch scope](docs/offline-profile.md).
 
-The Windows stdio lifetime fence retains a non-inherited handle to the original client pipe before SDK descriptor diversion. Parent-loss monitoring remains independent of pipe queries, including a blocking reader with an externally held writer. This is an app lifetime repair; the SDK/framework pins and transport stay unchanged.
+The current implementation provides 38 tools, revision/hash-pinned workflow guidance, bounded background index jobs, chunked artifact reads and durable request receipts. Windows workers use app-owned Job Objects and creation-checked resource records. Stdio lifetime monitoring retains the original client pipe before SDK descriptor diversion; numerical libraries are limited to one numerical thread per app/worker process. See the [implementation guide](docs/implementation.md) for responsibilities and limits.
 
-Numerical libraries are limited to one numerical thread per app/worker process before imports. The standalone binding supplies the same bounds, preventing ambient library thread settings from expanding the offline process budget. This does not replace request/worker limits or establish a hard per-process RSS quota.
-
-Current source release: **26.1023.072735**, stamped once in `America/New_York`. The app and both plugin manifests share the canonical package version `26.1023.72735`. [Versioning](docs/versioning.md) explains padded display timestamps, leading-zero normalization and release checks. Framework `0.20.0` and MCP SDK `2.3.0` remain independently pinned. Source/package verification does not establish installed or native acceptance.
+Current source release: **26.1023.113921**, stamped once in `America/New_York`. The app and both plugin manifests share the canonical package version `26.1023.113921`. [Versioning](docs/versioning.md) explains padded display timestamps, leading-zero normalization and release checks. Framework `0.20.0` and MCP SDK `2.3.0` remain independently pinned. Source/package verification does not establish installed or native acceptance.
 
 ## Table of Contents
 
@@ -41,6 +41,14 @@ Retained DWG conversion code is disabled in the standalone offline profile. DXF 
 
 ## Install
 
+From the project root, `InstallAndRun.cmd --help` lists options without installing dependencies or changing configuration. The same CMD installs and runs the application; `--install-only` stops after setup, and `--stdio` selects MCP stdio. Quote paths with spaces:
+
+```powershell
+.\InstallAndRun.cmd --framework-wheel "C:\Package files\universal_codex_tools-0.20.0-py3-none-any.whl" --root "drawings=C:\Engineering Drawings" --install-only
+```
+
+The default setup may register or refresh AutoCAD's standalone plugin. Use `--codex-integration none` to install the application without Codex registration. Existing roots are preserved. Setup remains an explicit installation operation; documentation and fixture checks do not require rerunning it on an existing installation.
+
 ### Dependencies
 
 - [Python](https://www.python.org/downloads/) 3.11 or later. The PowerShell examples use Python 3.13.
@@ -67,7 +75,7 @@ For unattended first setup, use `InstallAndRun.cmd --root "drawings=C:\Engineeri
 
 Setup defaults to `--codex-integration auto`, which installs or refreshes AutoCAD's standalone plugin. It preserves an explicitly saved skip or a disabled app plugin. An absent CLI or unreadable plugin inventory defers optional installation while leaving the application usable. Use `--codex-integration none` to skip plugin installation or `--install-plugin` to explicitly refresh and enable it. See [standalone plugin installation](docs/codex-integrations.md).
 
-Each application owns its Codex plugin and native skills; installation never depends on a universal plugin. The shared app framework and independent Windows manager supply common code and management. The historical Python names `universal-codex-tools` and `universal_tools` identify that package, without adding a universal Codex connection.
+Each application owns its Codex plugin and native skills; installation never depends on a universal plugin. The [shared framework and independent Windows manager](https://github.com/votecoffee/CodexMCPBroker) supply common code and management. The historical Python names `universal-codex-tools` and `universal_tools` identify that package, without adding a universal Codex connection.
 
 For manual installation in PowerShell:
 
@@ -136,11 +144,11 @@ Python clients use `ElectricalService(service).build("drawings", ...)` from `aut
 
 ### Shared app framework
 
-The shared-code prototype uses `universal_tools.framework.ApplicationHost` from pinned framework 0.20.0. Its fourteen stable tools discover versioned `drawing-engine` backends. **Host/proxy CLI deployment is blocked** until SDK stdio processes have app-owned resource tracking and containment; preparation/source assessment does not activate it. The standalone native server retains all 31 original operations plus guide/reference readers, a capability report, direct-owner index jobs and bounded artifact reads: 38 definitions. Source checks, app authorization and durable receipts remain authoritative.
+The direct standalone server uses framework 0.20.0 for shared resource ownership and management. It exposes all 31 original operations plus guide/reference readers, a capability report, direct-owner index jobs and bounded artifact reads: 38 definitions. Source checks, app authorization and durable receipts remain authoritative.
 
-Explicit isolated setup uses `framework-prepare`, `framework-serve` and `framework-proxy`. Published app code and nested extraction/render/table/highlight workers remain bound to immutable app snapshots. Original handlers, target/hash checks and app receipts remain authoritative. Backend feature/guide updates can refresh without changing the native front door; native skill/schema changes still require plugin update and Codex reload. Framework calls to one transient backend are serialized and add material startup latency. Actual Codex/native acceptance and recovery/admin UX remain separate work.
+The separate `ApplicationHost` prototype has fourteen fixed frontend tools and versioned drawing backends. `framework-prepare` creates isolated publications, but **host/proxy CLI startup is blocked** until SDK stdio processes have app-owned tracking and containment. Preparation does not activate that route. Earlier protocol fixtures and published snapshots remain source-assessment evidence.
 
-See [shared framework setup](docs/shared-app-framework.md) and [feature profiles](docs/runtime-features.md) before a separately selected pilot. One process owns the app host and its journals; concurrent frontends use that owner. The default installer uses native stdio; setup does not switch the plugin route or enable Tasks, Redis, OAuth or UI extensions.
+See [shared framework setup](docs/shared-app-framework.md) and [feature profiles](docs/runtime-features.md) before a separately selected pilot. The default plugin uses direct stdio; the interactive root CMD starts loopback HTTP unless `--stdio` is selected. Setup does not select a shared host or enable Tasks, Redis, OAuth or UI extensions.
 
 ### Standalone Codex plugin
 
@@ -156,7 +164,7 @@ The application ships its own standalone plugin. Explicitly install or restore i
 .\InstallAndRun.cmd --install-only --install-plugin
 ```
 
-This registers `autocad@autocad-local` using the Codex CLI after the verified framework dependency has been staged. Default legacy bindings start the app's own stdio server without a separate HTTP server. Explicit framework bindings use the app's already-running authenticated host through its own frontend. Both retain the application icon and small drawing-analysis skill; frequently changing framework guidance is read from the backend. Generated bindings and local paths stay under ignored `.local/codex-marketplace/`. The portable template has no personal configuration. See [framework plugin preparation](docs/shared-app-framework.md#publish-and-run-an-isolated-app-host).
+This registers `autocad@autocad-local` using the Codex CLI after the verified framework dependency has been staged. Default legacy bindings start the app's own stdio server without a separate HTTP server. The package retains the application icon and small drawing-analysis skill; detailed guidance is read from the backend. Generated bindings and local paths stay under ignored `.local/codex-marketplace/`. The portable template has no personal configuration. Framework binding preparation remains separate from its blocked deployment. See [framework plugin preparation](docs/shared-app-framework.md#publish-and-run-an-isolated-app-host).
 
 Use a new local chat or reload the plugin connection to discover the current tools after installation. The local Codex CLI must be available. `python scripts/install_plugin.py --prepare-only` creates the local package without changing Codex registration. Packaging follows [OpenAI's plugin format](https://developers.openai.com/plugins/build/plugins).
 
@@ -169,6 +177,9 @@ Direct stdio MCP configuration uses the absolute `.venv/Scripts/python.exe` comm
 | Tool | Purpose |
 | --- | --- |
 | `cad_status` | Roots, backends, limits and format support |
+| `cad_capabilities` | Effective profile, implemented features and acceptance boundaries |
+| `cad_get_workflow` | Current workflow guidance with revision and content hashes |
+| `cad_get_workflow_reference` | Read one revision/hash-pinned guidance topic |
 | `cad_concurrency_status` | Active/queued request counts and shared worker limits |
 | `cad_get_transaction` | Durable write status and recorded result by request ID |
 | `cad_list_files` | Recursive paginated inventory, including unsupported formats on request |
@@ -184,9 +195,13 @@ Direct stdio MCP configuration uses the absolute `.venv/Scripts/python.exe` comm
 | `cad_get_pdf_pages` | Page sizes, rotation, text and image counts, OCR candidates |
 | `cad_get_pdf_tables` | Heuristic cell extraction on one page |
 | `cad_index_project` | Bounded indexing into app-owned SQLite state; write-classified |
+| `cad_start_index_job` | Submit a bounded batch to a selected long-lived direct owner |
+| `cad_get_index_job` | Poll durable job progress with its private access token |
+| `cad_cancel_index_job` | Request cooperative cancellation between files |
 | `cad_search_project` | Literal project text search with freshness and coverage |
 | `cad_compare_drawings` | Text multiplicity and layer/block name changes |
 | `cad_render_preview` | App-owned PNG previews; write-classified |
+| `cad_get_artifact` | Read scoped preview/export bytes in hash-pinned 64 KiB chunks |
 | `cad_build_electrical_project` | Build a source-bound snapshot from drawings, optional WDP and explicit reports; write-classified |
 | `cad_get_electrical_project` | Counts, check coverage and current input freshness |
 | `cad_get_device_inventory` | Device occurrences with field provenance; optional separate PDF candidates |
@@ -198,7 +213,7 @@ Direct stdio MCP configuration uses the absolute `.venv/Scripts/python.exe` comm
 | `cad_check_drawing_consistency` | Duplicate tags, address conflicts, descriptions, references and panel differences |
 | `cad_compare_electrical_revisions` | Added, removed and changed device, I/O and connection records |
 | `cad_export_electrical_project` | Readback-verified JSON with source hashes and references; write-classified |
-| `cad_highlight_source_object` | Refused in the offline profile before native access; write-classified |
+| `cad_highlight_source_object` | Refused in both selected profiles before AutoCAD COM access; write-classified |
 
 ## Extraction boundaries
 
@@ -219,6 +234,8 @@ See [VERIFICATION.md](VERIFICATION.md) for synthetic checks, real MCP protocol c
 ## Development
 
 Install the verified framework wheel with the hash-locked `requirements-dev-lock.txt` using a local wheel directory, then install the editable app. Run `python -m pytest -q`, `ruff check .` and `ruff format --check .`. Keep framework development/editable dependencies in an isolated environment; never copy its implementation or use a source submodule. CLI, legacy MCP and framework workers share `DrawingService`; add domain logic there or in its workers rather than duplicating it in a transport.
+
+Follow the [developer guide](docs/development.md) for isolated setup, installer/configuration fixtures, dependency updates and source packaging. The [implementation guide](docs/implementation.md) maps the services, workers, receipts and management boundary. Optional host prototypes and native profiles require their own acceptance before deployment.
 
 The source tree keeps the shared service and workers in `src/autocad_mcp/`, reusable command line helpers in `scripts/`, synthetic fixtures and checks in `tests/`, and generic configuration examples in `examples/`. Machine configuration, runtime environments, customer inputs, extracted content and acceptance captures belong outside the tracked tree or under ignored `.local/`.
 
