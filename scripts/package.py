@@ -34,6 +34,7 @@ def selected_files(repo):
     for folder in ("src", "scripts", "tests"):
         files.extend((repo / folder).rglob("*.py"))
     files.append(repo / "examples/config.example.json")
+    files.append(repo / "examples/oda-read.config.example.json")
     for folder, extension in (("docs", "*.md"), ("schemas", "*.json")):
         files.extend((repo / folder).rglob(extension))
     for path in (repo / "plugins" / "autocad").rglob("*"):

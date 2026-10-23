@@ -1,20 +1,30 @@
 """Implementation profile, including precise opt-in and acceptance boundaries."""
 
 from . import __display_version__, __version__
+from .config import SUPPORTED
+from .oda import NATIVE_FORMATS
+from .profile import ODA_PROFILE, PROFILE
 from .version import VERSION_TIMEZONE
 
 
-def report(backend=False):
+def report(backend=False, config=None):
+    profile = config.execution_profile if config else PROFILE
+    formats = config.supported_extensions if config else SUPPORTED
     return {
         "app_id": "autocad",
         "version": __version__,
         "display_version": __display_version__,
         "version_timezone": VERSION_TIMEZONE,
-        "execution_profile": "offline",
+        "execution_profile": profile,
         "numerical_threads_per_process": 1,
-        "native_operations_available": False,
-        "available_formats": [".dxf", ".pdf"],
-        "blocked_formats": [".dwg", ".dwt", ".dws"],
+        "native_operations_available": profile == ODA_PROFILE,
+        "autocad_automation_available": False,
+        "available_formats": sorted(formats),
+        "blocked_formats": sorted(NATIVE_FORMATS - formats),
+        "oda_conversion": {
+            "state": "configured" if profile == ODA_PROFILE else "disabled",
+            "boundary": "Explicit Windows oda-read profile and pinned operator-installed converter; synthetic source tests do not establish installed/native acceptance",
+        },
         "framework": "0.20.0",
         "sdk": "2.3.0",
         "selected_surface": "drawing-engine backend" if backend else "direct native server",

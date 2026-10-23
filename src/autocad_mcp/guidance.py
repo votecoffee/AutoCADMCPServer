@@ -56,9 +56,12 @@ Freshness describes the captured artifact, not a new validation. Root scope is r
 legacy artifacts without root authorization metadata must be regenerated. Catalog events are
 hints: refetch on reconnect. Fixed framework stdio proxies use the ordinary chunk reader because
 they do not forward native resource/skill methods. Never switch routes automatically.
-Inspect cad_concurrency_status when busy. This standalone offline profile accepts PDF/DXF and
-Electrical reports. DWG/DWT/DWS conversion and cad_highlight_source_object are unavailable;
-configuration, environment and request flags cannot enable native engineering execution.
+Inspect cad_concurrency_status when busy. Read cad_status and cad_capabilities for the
+selected configuration. The default offline profile accepts PDF/DXF and Electrical reports.
+The explicit Windows oda-read profile adds DWG/DWT/DWS structural conversion with a pinned,
+operator-installed ODA executable. It uses private snapshots and records converter/input/DXF
+hashes. Conversion is not native AutoCAD validation. No tool/request flag selects profiles or
+executables. AutoCAD COM attachment and cad_highlight_source_object remain unavailable.
 cad_status resource_ownership describes this supervisor's cached resource observations. Shared
 durable records support reviewed recovery; native/Codex acceptance remains separate. Never kill software by
 name or a stale PID, close an attached user-owned application or treat process exit as rollback.

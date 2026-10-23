@@ -5,7 +5,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from .profile import PROFILE, validate_profile
+from .oda import NATIVE_FORMATS, converter_path
+from .profile import ODA_PROFILE, PROFILE, validate_profile
 
 SUPPORTED = {".dxf", ".pdf"}
 
@@ -31,12 +32,28 @@ class Config:
     max_index_jobs: int = 8
     lock_timeout_seconds: int = 180
     execution_profile: str = PROFILE
+    oda_sha256: str | None = None
+
+    @property
+    def supported_extensions(self):
+        return SUPPORTED | NATIVE_FORMATS if self.execution_profile == ODA_PROFILE else SUPPORTED
+
+    def conversion_options(self):
+        return {
+            "execution_profile": self.execution_profile,
+            "oda_executable": str(self.oda_executable) if self.oda_executable else None,
+            "oda_sha256": self.oda_sha256,
+            "max_file_bytes": self.max_file_bytes,
+        }
 
     @classmethod
     def load(cls, filename: str | Path) -> Config:
         filename = Path(filename).resolve(strict=True)
         raw = json.loads(filename.read_text(encoding="utf-8-sig"))
-        validate_profile(raw.get("execution_profile", PROFILE), raw.get("oda_executable"))
+        profile = raw.get("execution_profile", PROFILE)
+        executable, pin = raw.get("oda_executable"), raw.get("oda_sha256")
+        validate_profile(profile, executable, pin)
+        executable = converter_path(executable) if executable else None
         roots = {name: Path(value).resolve(strict=True) for name, value in raw["roots"].items()}
         if not roots or any(
             not name or "/" in name or "\\" in name or not p.is_dir() for name, p in roots.items()
@@ -59,7 +76,14 @@ class Config:
             if type(value) is not int or not low <= value <= high:
                 raise ValueError(f"{key} must be an integer in {low}..{high}")
             concurrency[key] = value
-        return cls(roots, state, execution_profile=PROFILE, **concurrency)
+        return cls(
+            roots,
+            state,
+            execution_profile=profile,
+            oda_executable=executable,
+            oda_sha256=pin,
+            **concurrency,
+        )
 
     def resolve(self, root_id: str, relative_path: str) -> Path:
         if root_id not in self.roots:
@@ -101,7 +125,7 @@ class Config:
                         "extension": path.suffix.lower(),
                         "size_bytes": stat.st_size,
                         "mtime_ns": stat.st_mtime_ns,
-                        "supported": path.suffix.lower() in SUPPORTED,
+                        "supported": path.suffix.lower() in self.supported_extensions,
                     }
                 )
                 if len(result) > 100_000:

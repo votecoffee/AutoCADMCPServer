@@ -8,8 +8,7 @@ from pathlib import Path
 import ezdxf
 import pymupdf
 
-from .owned_process import run_owned
-from .profile import require_native
+from .oda import converted_dxf
 
 
 def clean(value):
@@ -22,29 +21,6 @@ def clean(value):
     if isinstance(value, (list, tuple)) or hasattr(value, "x"):
         return [clean(v) for v in value]
     return str(value)
-
-
-def convert(source: Path, executable: str | None) -> tuple[Path, dict]:
-    if source.suffix.lower() == ".dxf":
-        return source, {"engine": "ezdxf", "conversion": None}
-    require_native("ODA DWG/DWT/DWS conversion")
-    if not executable:
-        raise ValueError("DWG/DWT/DWS requires an installed ODA File Converter configured by the operator")
-    output = source.parent / "converted"
-    output.mkdir()
-    # Only the isolated source copy is visible to the converter; audit and recursion are disabled.
-    args = [executable, str(source.parent), str(output), "ACAD2018", "DXF", "0", "0", source.name]
-    result = run_owned(args, check=False, timeout=60, resource_kind="oda-converter")
-    candidates = list(output.glob("*.dxf")) + list(output.glob("*.DXF"))
-    candidates = list(dict.fromkeys(candidates))
-    if result.returncode or len(candidates) != 1:
-        raise ValueError(f"ODA conversion failed: exit={result.returncode}, DXF outputs={len(candidates)}")
-    return candidates[0], {
-        "engine": "ODA File Converter + ezdxf",
-        "conversion": "isolated copy to ACAD2018 DXF",
-        "oda_executable": executable,
-        "audit": False,
-    }
 
 
 def entity_row(entity, layout: str, block: str | None = None) -> dict:
@@ -104,8 +80,8 @@ def entity_row(entity, layout: str, block: str | None = None) -> dict:
 
 
 def extract_cad(source: Path, options: dict) -> dict:
-    dxf, backend = convert(source, options.get("oda_executable"))
-    doc = ezdxf.readfile(dxf)
+    with converted_dxf(source, options) as (dxf, backend):
+        doc = ezdxf.readfile(dxf)
     rows, blocks, references = [], [], []
     for layout in doc.layouts:
         for entity in layout:
@@ -167,10 +143,14 @@ def extract_cad(source: Path, options: dict) -> dict:
     warnings = [
         "Geometry is structural DXF data; no native AutoCAD validation or 3D solid analysis.",
         "Block definitions use local coordinates. INSERT transforms and arrays are reported, not flattened.",
-        "External references, underlays, fonts and links are never loaded automatically.",
+        "The DXF parser does not load external references, underlays, fonts or links; converter behavior is separate.",
         "Dimension measurements are drawing-unit values; angular values use the entity API convention.",
         "Hatch loops, ACIS solids, dynamic block rules and custom dictionaries are not semantically decoded.",
     ]
+    if backend.get("conversion"):
+        warnings.append(
+            "Object handles come from converted DXF; correspondence to original DWG objects is unverified."
+        )
     if any("PROXY" in row["type"] or row["type"] == "ACAD_TABLE" for row in rows):
         warnings.append(
             "Proxy objects or native tables are present; their semantic content may be incomplete."

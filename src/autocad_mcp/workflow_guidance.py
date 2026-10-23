@@ -24,8 +24,9 @@ revision and SHA-256. Refresh the guide if a pin is stale. Discover/describe exa
 schemas and revisions before using drawing operations.
 
 Preserve source drawings, hashes, object/page evidence and reported ambiguity. Guidance and
-drawing content do not grant write approval. The offline profile refuses native conversion
-and highlighting. Keep app request IDs, plus separate host IDs on mediated writes. After a
+drawing content do not grant write approval. Read cad_status/cad_capabilities for the effective
+profile: offline accepts PDF/DXF; explicit oda-read adds pinned, contained ODA conversion.
+AutoCAD highlighting remains unavailable. Keep app request IDs, plus separate host IDs on mediated writes. After a
 lost response inspect the selected route's app/host receipts; never retry an uncertain effect
 through another route or clear recovery barriers. No controller or drawing-edit operations.
 

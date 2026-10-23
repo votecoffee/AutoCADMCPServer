@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from autocad_mcp import autocad, electrical_server, extract
+from autocad_mcp import autocad, electrical_server, extract, oda
 from autocad_mcp.capabilities import report
 from autocad_mcp.config import Config
 from autocad_mcp.owned_process import run_owned
@@ -55,7 +55,7 @@ def test_environment_cannot_enable_native_execution(tmp_path, monkeypatch):
     path, _ = configuration(tmp_path)
     monkeypatch.setenv("AUTOCAD_MCP_EXECUTION_PROFILE", "native")
     monkeypatch.setenv("AUTOCAD_MCP_ENABLE_NATIVE", "1")
-    with pytest.raises(ValueError, match="Only execution_profile='offline'"):
+    with pytest.raises(ValueError, match="Execution profile differs"):
         Config.load(path)
     with pytest.raises(ValueError, match="standalone offline profile"):
         autocad.highlight(None, {})
@@ -73,7 +73,7 @@ def test_converter_and_private_worker_refuse_before_launch_or_output_creation(
     tmp_path, monkeypatch, extension
 ):
     launches = []
-    monkeypatch.setattr(extract, "run_owned", lambda *args, **kwargs: launches.append(args))
+    monkeypatch.setattr(oda, "run_owned", lambda *args, **kwargs: launches.append(args))
     source, destination = tmp_path / ("source" + extension), tmp_path / "response.json"
     source.write_bytes(b"Synthetic native-format stand-in")
     options = json.dumps({"oda_executable": "C:/must-not-start.exe", "max_entities": 10})

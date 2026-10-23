@@ -2,13 +2,13 @@
 
 The selected Windows profile is the app's independent native stdio MCP endpoint with `execution_profile: "offline"`. It provides local PDF/DXF extraction, previews, PDF tables, Electrical report/WDP membership analysis, inventories, tracing, consistency checks, revision comparison, bounded index jobs and scoped exports. Imported native Electrical relationships remain report assertions; PDF candidates and ordinary block interpretation retain their separate provenance.
 
-DWG/DWT/DWS extraction and AutoCAD highlighting are unavailable in this release. These formats can appear in inventory or report references, but the app does not convert or open them. `cad_status` and `cad_capabilities` report the effective formats and refused operations. Native acceptance is separate from this useful offline profile.
+DWG/DWT/DWS extraction and AutoCAD highlighting are unavailable in this profile. These formats can appear in inventory or report references. A separate explicit [oda-read candidate](oda-read.md) restores contained structural conversion with a pinned operator-installed converter; it does not change an accepted offline installation. `cad_status` and `cad_capabilities` report effective formats and refused operations. Native acceptance is separate from this useful offline profile.
 
 ## Enforced gates
 
-- Missing `execution_profile` means `offline`; any other value is rejected. `AUTOCAD_MCP_EXECUTION_PROFILE` must be absent or `offline`, and generated standalone bindings explicitly set it to `offline`.
+- Missing `execution_profile` means `offline`. In this profile `AUTOCAD_MCP_EXECUTION_PROFILE` must be absent or `offline`; its generated standalone binding fixes that value. The separately configured `oda-read` profile fixes its own binding to that value. Other profiles are rejected.
 - `oda_executable` must be absent or empty. There is no ODA installation scan. Existing configurations with a converter path fail validation without being edited. Programmatic `DrawingService` construction applies the same check before state or executable access.
-- Converter entrypoints reject native formats before output creation or process launch, even with a supplied executable. Highlight service, tool and private worker entrypoints reject before source lookup, COM attachment or helper launch. No environment, request or CLI option enables these native routes. Retained internals are tested only with stubbed gates/APIs.
+- In this profile converter entrypoints reject native formats before output creation or process launch, even with a supplied executable. Highlight service, tool and private worker entrypoints reject before source lookup, COM attachment or helper launch in both profiles. Environment and request flags cannot bypass these gates.
 - Experimental shared-host/backend/proxy startup remains blocked by its existing SDK stdio ownership gate. It is not part of this profile. There are no controller, source-control, vendor-application or drawing-edit tools. Source references do not execute commands.
 
 Do not rewrite an installed configuration to adopt this release automatically. Prepare a separate explicit offline configuration and immutable package for a staged canary. Installation/activation needs its own release authorization.

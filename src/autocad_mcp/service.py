@@ -17,11 +17,12 @@ import ezdxf
 import pymupdf
 
 from . import EXTRACTION_VERSION, __display_version__, __version__
-from .config import SUPPORTED, Config
+from .config import Config
 from .coordination import Coordinator
+from .oda import NATIVE_FORMATS, pinned_converter
 from .owned_process import run_owned
 from .owned_resources import owned_resources
-from .profile import validate_profile
+from .profile import ODA_PROFILE, validate_profile
 from .worker_launch import worker_command
 
 
@@ -81,7 +82,10 @@ def paginate(rows: list, offset: int = 0, limit: int = 100) -> dict:
 
 class DrawingService:
     def __init__(self, config: Config):
-        validate_profile(config.execution_profile, config.oda_executable)
+        validate_profile(config.execution_profile, config.oda_executable, config.oda_sha256)
+        if config.execution_profile == ODA_PROFILE:
+            with pinned_converter(config.oda_executable, config.oda_sha256):
+                pass
         self.config = config
         self.coordinator = Coordinator(
             config.state, config.lock_timeout_seconds, config.max_worker_processes, config.max_oda_processes
@@ -94,7 +98,9 @@ class DrawingService:
                     "schema": EXTRACTION_VERSION,
                     "ezdxf": ezdxf.__version__,
                     "pymupdf": pymupdf.VersionBind,
-                    "oda": sha256(config.oda_executable) if config.oda_executable else None,
+                    "profile": config.execution_profile,
+                    "oda": config.oda_sha256,
+                    "converter": sha256(Path(__file__).with_name("oda.py")),
                     "extractor": sha256(Path(__file__).with_name("extract.py")),
                 },
                 sort_keys=True,
@@ -129,13 +135,15 @@ class DrawingService:
             "display_version": __display_version__,
             "execution_profile": self.config.execution_profile,
             "numerical_threads_per_process": 1,
-            "native_operations_available": False,
-            "blocked_extensions": [".dwg", ".dwt", ".dws"],
+            "native_operations_available": self.config.execution_profile == ODA_PROFILE,
+            "autocad_automation_available": False,
+            "blocked_extensions": sorted(NATIVE_FORMATS - self.config.supported_extensions),
             "roots": {k: str(v) for k, v in self.config.roots.items()},
             "state_dir": str(self.config.state),
-            "supported_extensions": sorted(SUPPORTED),
+            "supported_extensions": sorted(self.config.supported_extensions),
             "oda_available": bool(self.config.oda_executable),
             "oda_executable": str(self.config.oda_executable) if self.config.oda_executable else None,
+            "oda_sha256": self.config.oda_sha256,
             "engines": {"ezdxf": ezdxf.__version__, "PyMuPDF": pymupdf.VersionBind},
             "extraction_signature": self.signature,
             "resource_ownership": owned_resources.snapshot(),
@@ -158,7 +166,7 @@ class DrawingService:
                 "DWT/DWS use the DWG conversion route; validate each input individually.",
                 "DGN/DWF/DWFx, STEP/IGES, SolidWorks and eDrawings: inventory only.",
                 "DWG structure is extracted via ODA/DXF; native CAD tables and custom proxies may be incomplete.",
-                "No CAD editing, network reference loading or automatic OCR; optional guarded AutoCAD UI highlighting only.",
+                "No CAD editing or automatic OCR; DXF/PDF readers do not resolve external references.",
             ],
             "electrical_inputs": [
                 "WDP project membership",
@@ -179,7 +187,7 @@ class DrawingService:
     def load(self, root_id: str, relative_path: str, *, cached_only: bool = False) -> dict:
         path = self.config.resolve(root_id, relative_path)
         extension = path.suffix.lower()
-        if extension not in SUPPORTED:
+        if extension not in self.config.supported_extensions:
             raise ValueError(f"Extraction is not supported for {extension}; inventory only")
         before = sha256(path)
         cache_key = hashlib.sha256(f"{before}:{extension}:{self.signature}".encode()).hexdigest()
@@ -215,7 +223,7 @@ class DrawingService:
                 raise ValueError("Source changed during snapshot; retry against a stable source")
             destination = scratch / "extraction.json"
             options = {
-                "oda_executable": str(self.config.oda_executable) if self.config.oda_executable else None,
+                **self.config.conversion_options(),
                 "max_entities": self.config.max_entities,
                 "max_pages": self.config.max_pages,
             }
@@ -493,9 +501,7 @@ class DrawingService:
                         "page": page,
                         "layout": layout,
                         "width": width,
-                        "oda_executable": str(self.config.oda_executable)
-                        if self.config.oda_executable
-                        else None,
+                        **self.config.conversion_options(),
                     }
                 ),
             )

@@ -64,3 +64,24 @@ def test_plugin_binding_is_local_independent_and_relocatable(tmp_path):
     binding = json.loads((framework_package / "mcp.json").read_bytes())["mcpServers"]["autocad"]
     assert "framework-proxy" in binding["args"] and str(state) in binding["args"]
     assert "universal_tools" not in binding["args"]
+
+    # Explicit candidate configuration stays on AutoCAD's own standalone binding.
+    # This only prepares disposable JSON; the placeholder binary is never started.
+    converter = repo / "standin.exe"
+    converter.write_bytes(b"not executable")
+    import hashlib
+
+    alternate.write_text(
+        json.dumps(
+            {
+                "roots": {"test": str(drawings)},
+                "execution_profile": "oda-read",
+                "oda_executable": str(converter),
+                "oda_sha256": hashlib.sha256(converter.read_bytes()).hexdigest(),
+            }
+        )
+    )
+    oda_package = Path(prepare(repo, alternate)["package"])
+    oda_binding = json.loads((oda_package / "mcp.json").read_bytes())["mcpServers"]["autocad"]
+    assert oda_binding["env"]["AUTOCAD_MCP_EXECUTION_PROFILE"] == "oda-read"
+    assert oda_binding["args"] == ["-m", "autocad_mcp", "--config", str(alternate), "serve"]

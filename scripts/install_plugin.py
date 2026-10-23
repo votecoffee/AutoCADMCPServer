@@ -31,7 +31,7 @@ def prepare(repo: Path, config: Path | None = None, *, frontend="legacy", host_s
     from autocad_mcp.config import Config
     from autocad_mcp.profile import NUMERICAL_ENVIRONMENT
 
-    Config.load(config)
+    selected_config = Config.load(config)
     for name in ("plugin.json", ".codex-plugin/plugin.json"):
         if json.loads((template / name).read_bytes())["version"] != __version__:
             raise ValueError("Plugin manifest must match the app package version")
@@ -42,7 +42,7 @@ def prepare(repo: Path, config: Path | None = None, *, frontend="legacy", host_s
         "cwd": str(repo),
         "env": {
             **NUMERICAL_ENVIRONMENT,
-            "AUTOCAD_MCP_EXECUTION_PROFILE": "offline",
+            "AUTOCAD_MCP_EXECUTION_PROFILE": selected_config.execution_profile,
             "AUTOCAD_MCP_PLUGIN_VERSION": __version__,
             "AUTOCAD_MCP_PLUGIN_DISPLAY_VERSION": __display_version__,
         },

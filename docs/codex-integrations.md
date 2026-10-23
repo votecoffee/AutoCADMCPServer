@@ -20,6 +20,10 @@ The experimental framework frontend is source-assessment code with fourteen fixe
 
 `python scripts/install_plugin.py --prepare-only` generates private bindings without registering them. `--frontend framework --host-state PATH` explicitly prepares the app-owned frontend; native stdio remains the default. Generated bindings live under ignored `.local/codex-marketplace/`. Reload the plugin connection or use a new chat after native package updates.
 
+Bindings fix `AUTOCAD_MCP_EXECUTION_PROFILE` to the explicitly selected configuration.
+The default remains offline; [oda-read](oda-read.md) requires a reviewed converter pin
+and separate candidate acceptance. Preparation does not change an installed plugin.
+
 ## Concurrency and recovery
 
 Native calls can overlap within [app limits](concurrency.md); calls through one framework backend serialize. Durable drawing snapshots and request receipts are shared app state, with explicit targets rather than private per-chat selections.

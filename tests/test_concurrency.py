@@ -11,6 +11,45 @@ from autocad_mcp.coordination import Coordinator, RequestScheduler, ResourceBusy
 from autocad_mcp.transactions import Transactions
 
 
+def test_empty_lock_file_needs_no_write_and_contenders_wait(tmp_path):
+    first, second = Coordinator(tmp_path), Coordinator(tmp_path)
+    held = first._try("empty")
+    assert held is not None
+    try:
+        assert next(first.folder.iterdir()).stat().st_size == 0
+        assert second._try("empty") is None
+    finally:
+        first._release(held)
+    with second.lock("empty", timeout=1):
+        assert next(first.folder.iterdir()).stat().st_size == 0
+
+
+def test_simultaneous_first_lock_users_serialize_without_initialization(tmp_path):
+    import time
+
+    start, guard = threading.Barrier(8), threading.Lock()
+    active, peak, completed = 0, 0, 0
+
+    def contender(_):
+        nonlocal active, peak, completed
+        coordinator = Coordinator(tmp_path, timeout=10)
+        start.wait(timeout=5)
+        for _ in range(4):
+            with coordinator.lock("same-new-key"):
+                with guard:
+                    active += 1
+                    peak = max(peak, active)
+                time.sleep(0.002)
+                with guard:
+                    active -= 1
+                    completed += 1
+
+    with ThreadPoolExecutor(8) as pool:
+        list(pool.map(contender, range(8)))
+    assert completed == 32 and active == 0 and peak == 1
+    assert next((tmp_path / "locks").iterdir()).stat().st_size == 0
+
+
 def hold_lock(state, entered, release):
     with Coordinator(Path(state), timeout=2).lock("shared"):
         entered.set()

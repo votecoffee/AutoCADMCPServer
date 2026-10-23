@@ -136,7 +136,7 @@ def create_server(
         """Read feature/doctor status, selected profile, implementation evidence and concrete blockers."""
         from .capabilities import report
 
-        return {**report(workflow), "discovery_round_trips": dict(mcp.discovery_round_trips)}
+        return {**report(workflow, service.config), "discovery_round_trips": dict(mcp.discovery_round_trips)}
 
     @tool(read=False)
     def cad_start_index_job(root_id: str, offset: int = 0, limit: int = 5) -> dict:

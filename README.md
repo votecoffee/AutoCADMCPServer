@@ -6,13 +6,13 @@ Source-preserving local DWG, DXF, PDF and AutoCAD Electrical information extract
 
 Extract drawing information through a shared Python service, command line interface and Model Context Protocol server. Device and PLC I/O inventories, connection tracing, equipment grouping, documented network inventory, consistency checks, revision comparison and JSON exports retain source evidence. Current guidance, bounded index jobs/artifacts and durable ownership of private worker trees retain AutoCAD's independent plugin and native endpoint. Experimental app-host deployment is blocked pending its SDK stdio ownership adapter. Native report assertions, observed attributes and interpretation stay distinct. Sources are preserved; native highlighting is unavailable in the offline profile. The repository is named `AutoCADMCPServer`; the Python distribution is `autocad-mcp-server`.
 
-The selected profile is **direct standalone offline** on Windows: local PDF/DXF and Electrical report analysis. Native DWG/DWT/DWS conversion and AutoCAD highlighting are refused by code, configuration and environment gates. See [offline profile and launch scope](docs/offline-profile.md).
+The default is **direct standalone offline** on Windows: local PDF/DXF and Electrical report analysis. A separate explicit [oda-read candidate](docs/oda-read.md) restores contained DWG/DWT/DWS structural conversion and previews with a pinned operator-installed ODA executable. Source/package preparation leaves an accepted offline installation unchanged. AutoCAD COM attachment/highlighting remains unavailable. See [offline profile and launch scope](docs/offline-profile.md).
 
 The Windows stdio lifetime fence retains a non-inherited handle to the original client pipe before SDK descriptor diversion. Parent-loss monitoring remains independent of pipe queries, including a blocking reader with an externally held writer. This is an app lifetime repair; the SDK/framework pins and transport stay unchanged.
 
 Numerical libraries are limited to one numerical thread per app/worker process before imports. The standalone binding supplies the same bounds, preventing ambient library thread settings from expanding the offline process budget. This does not replace request/worker limits or establish a hard per-process RSS quota.
 
-Current source release: **26.1022.195151**, stamped once in `America/New_York`. The app and both plugin manifests share the canonical package version `26.1022.195151`. [Versioning](docs/versioning.md) explains padded display timestamps, leading-zero normalization and release checks. Framework `0.20.0` and MCP SDK `2.3.0` remain independently pinned. Source/package verification does not establish installed or native acceptance.
+Current source release: **26.1023.072735**, stamped once in `America/New_York`. The app and both plugin manifests share the canonical package version `26.1023.72735`. [Versioning](docs/versioning.md) explains padded display timestamps, leading-zero normalization and release checks. Framework `0.20.0` and MCP SDK `2.3.0` remain independently pinned. Source/package verification does not establish installed or native acceptance.
 
 ## Table of Contents
 
@@ -45,9 +45,9 @@ Retained DWG conversion code is disabled in the standalone offline profile. DXF 
 
 - [Python](https://www.python.org/downloads/) 3.11 or later. The PowerShell examples use Python 3.13.
 - The verified local `universal-codex-tools==0.20.0` framework wheel built from the [pushed framework baseline](https://github.com/votecoffee/CodexMCPBroker/commit/5b2cac50ca24d21a15b732e0424bb02fd794e1fb). It is a normal pinned Python dependency; no public package feed is shipped yet. MCP is pinned at **2.3.0**; setup rejects an older framework SDK pin instead of downgrading the app. See [framework dependency and verification](docs/shared-app-framework.md#dependency-and-packaging).
-- PDF/DXF extraction uses the locked Python libraries; no external converter or CAD application is needed. ODA conversion is unavailable in this offline release, including when ODA is installed.
+- PDF/DXF extraction uses the locked Python libraries; no external converter or CAD application is needed. The default offline profile refuses ODA conversion even when ODA is installed. The separate [oda-read candidate](docs/oda-read.md) requires explicit configuration and a reviewed executable hash.
 
-AutoCAD highlighting is unavailable in this offline release. Retained native code and COM stubs do not authorize or activate it. No configuration, environment or tool option enables native execution.
+AutoCAD highlighting remains unavailable in both profiles. Retained native code and COM stubs do not activate it. No configuration, environment or tool option enables AutoCAD COM attachment.
 
 ODA and Autodesk binaries are not redistributed. Python runtime dependencies are installed from the hash-locked requirements file below.
 

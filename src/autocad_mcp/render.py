@@ -4,7 +4,7 @@ from pathlib import Path
 import ezdxf
 import pymupdf
 
-from .extract import convert
+from .oda import converted_dxf
 
 
 def run_tables(source: str, destination: str, options: str):
@@ -39,8 +39,8 @@ def run_worker(source: str, destination: str, options: str):
         from ezdxf.addons.drawing import pymupdf as backend
         from ezdxf.addons.drawing.config import BackgroundPolicy, ColorPolicy, Configuration
 
-        dxf, _ = convert(path, opts.get("oda_executable"))
-        doc = ezdxf.readfile(dxf)
+        with converted_dxf(path, opts) as (dxf, _):
+            doc = ezdxf.readfile(dxf)
         target_layout = doc.layouts.get(opts["layout"])
         renderer = backend.PyMuPdfBackend()
         config = Configuration(color_policy=ColorPolicy.BLACK, background_policy=BackgroundPolicy.WHITE)

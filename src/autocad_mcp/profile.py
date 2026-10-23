@@ -1,8 +1,10 @@
-"""The released standalone profile has no native engineering execution route."""
+"""Explicit operator profiles; environment or request flags cannot enable native work."""
 
 import os
+import re
 
 PROFILE = "offline"
+ODA_PROFILE = "oda-read"
 NATIVE_BLOCKER = "Native engineering operations are unavailable in the standalone offline profile"
 NUMERICAL_ENVIRONMENT = {
     name: "1"
@@ -24,13 +26,20 @@ def configure_runtime():
     os.environ.update(NUMERICAL_ENVIRONMENT)
 
 
-def validate_profile(profile="offline", oda_executable=None):
-    if profile != PROFILE or os.environ.get("AUTOCAD_MCP_EXECUTION_PROFILE", PROFILE) != PROFILE:
-        raise ValueError("Only execution_profile='offline' is supported by this release")
-    if oda_executable not in (None, ""):
-        raise ValueError(NATIVE_BLOCKER + "; oda_executable must be unset")
+def validate_profile(profile=PROFILE, oda_executable=None, oda_sha256=None):
+    if profile not in (PROFILE, ODA_PROFILE):
+        raise ValueError("Only execution_profile='offline' or 'oda-read' is supported")
+    if os.environ.get("AUTOCAD_MCP_EXECUTION_PROFILE", profile) != profile:
+        raise ValueError("Execution profile differs from AUTOCAD_MCP_EXECUTION_PROFILE")
+    if profile == PROFILE:
+        if oda_executable not in (None, "") or oda_sha256 not in (None, ""):
+            raise ValueError(NATIVE_BLOCKER + "; oda_executable must be unset")
+    elif (
+        not oda_executable or not isinstance(oda_sha256, str) or not re.fullmatch("[0-9a-f]{64}", oda_sha256)
+    ):
+        raise ValueError("oda-read requires an absolute oda_executable and lowercase oda_sha256 pin")
 
 
 def require_native(operation):
-    # Deliberately no config, environment, CLI or request flag can open this gate.
+    # AutoCAD COM remains separate from the contained, read-only ODA adapter.
     raise ValueError(NATIVE_BLOCKER + ": " + operation)

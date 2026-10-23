@@ -1,5 +1,15 @@
 # Verification
 
+The [oda-read candidate](docs/oda-read.md) has a separate source gate:
+`python -m pytest tests/test_oda.py tests/test_offline_profile.py tests/test_plugin.py -q`.
+It uses generated DXF, fake DWG bytes, a non-executable binary pin fixture and harmless
+private Python process stand-ins. It checks fixed converter arguments, isolation,
+input/DXF hashes, cache readback, source-change rejection, corrupt/ambiguous/oversized
+output, wrong profile/pin, Windows write/delete denial and terminal durable receipts
+on success/timeout. No actual ODA, AutoCAD, customer drawing or installed plugin starts.
+Keep native pilot results separate; source preparation must not replace an accepted
+offline deployment before the pilot described in that document.
+
 `tests/test_stdio_lifetime.py` starts no MCP server: it uses the pinned SDK descriptor claim in harmless private Python jobs. It verifies a live writer survives fd 0 diversion beyond the grace interval, true EOF exits70, actual parent death with an external writer and blocking reader self-exits before outer cleanup, and non-inherited duplicate ownership across normal/partial startup and scope failure. Retain fixture source, exact identities, timelines, exit codes and job receipts; these are source lifecycle checks, not installed MCP acceptance.
 
 The offline profile regression includes a real NumPy-only private helper: request two numerical threads before importing the app, then verify package bootstrap limits the actual OpenBLAS pool to one before numerical initialization. This starts no MCP or native engineering application. Retain per-process private commit, working set, thread counts, exact library hashes and bounded job metrics when investigating numerical startup allocation; an exception label alone is insufficient.

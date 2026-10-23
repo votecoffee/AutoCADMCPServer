@@ -17,6 +17,12 @@ AutoCAD uses the reviewed shared framework 0.20.0 `ResourceLedger` and `Resource
 
 The ordinary installer is an explicit user-driven setup process, separate from the MCP server's runtime ownership scope. It does not start a manager. Plugin installation, setup subprocesses and deployment acceptance remain separate operations; the source checks do not constitute installation.
 
+The [oda-read candidate](oda-read.md) enables the ODA row only through explicit Windows
+configuration with an executable hash pin. Offline bindings still refuse it. The AutoCAD
+highlighting/attachment rows describe retained guarded internals; neither profile enables
+COM. ODA-shaped success/timeout fixtures exercise real private Python jobs and terminal
+ledger receipts without launching ODA or AutoCAD.
+
 ## Durable records and cached status
 
 The ledger uses the same explicit private registry as management: `--management-registry` on `serve`, or `AUTOCAD_MCP_MANAGEMENT_REGISTRY`. CLI extraction can select the registry through that environment variable. Without an override, the shared Windows known-folder registry is used. Records retain host ID, supervisor generation, owner/resource PID, creation FILETIME, normalized executable image, ownership, containment, current members and cleanup receipts. Arguments, environment values, credentials and drawing contents are not stored in resource records.

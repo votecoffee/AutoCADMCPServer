@@ -27,9 +27,8 @@ class Coordinator:
     def _try(self, resource):
         path = self.folder / (hashlib.sha256(resource.encode()).hexdigest() + ".lock")
         stream = path.open("a+b")
-        if path.stat().st_size == 0:
-            stream.write(b"\0")
-            stream.flush()
+        # Windows byte ranges can extend beyond EOF. Do not initialize the file:
+        # a contender can flush its initialization after another handle locks byte 0.
         stream.seek(0)
         try:
             if os.name == "nt":

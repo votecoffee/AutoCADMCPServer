@@ -150,6 +150,8 @@ async def test_mcp_classification_and_result_budget(drawing_service):
                 "cad_build_electrical_project",
                 "cad_export_electrical_project",
                 "cad_highlight_source_object",
+                "cad_start_index_job",
+                "cad_cancel_index_job",
             }
         )
         assert tool.annotations.open_world_hint is False

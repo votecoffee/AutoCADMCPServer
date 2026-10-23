@@ -1,0 +1,12 @@
+{
+  "execution_profile": "oda-read",
+  "roots": {
+    "drawings": "C:/Engineering/Drawings"
+  },
+  "state_dir": "C:/Engineering/AutoCADState/oda-read",
+  "oda_executable": "C:/Program Files/ODA/ODAFileConverter/ODAFileConverter.exe",
+  "oda_sha256": "REPLACE_WITH_REVIEWED_EXECUTABLE_SHA256",
+  "max_worker_processes": 2,
+  "max_oda_processes": 1,
+  "max_server_instances": 2
+}
