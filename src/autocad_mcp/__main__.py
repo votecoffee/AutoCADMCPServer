@@ -151,6 +151,7 @@ def _serve(config, args):
     from .service import DrawingService
 
     owned_resources.configure(args.management_registry)
+    owned_resources.initialize()
     service = DrawingService(config)
     scheduler = RequestScheduler(service.config.max_concurrent_requests, service.config.max_queued_requests)
     server = create_server(service, args.port, workflow=args.workflow, scheduler=scheduler)

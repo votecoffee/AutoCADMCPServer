@@ -17,6 +17,7 @@ class OwnedResources:
         self.launches = {}
         self.durable_cache = {}
         self.close_warning = None
+        self.recovery = {"examined": 0, "retired": [], "preserved": 0, "errors": 0}
 
     def configure(self, registry=None):
         with self.launch_guard:
@@ -37,6 +38,15 @@ class OwnedResources:
             )
             self.owner = self.ledger.owner("autocad")
         return self.owner
+
+    def initialize(self):
+        from .recovery import reconcile_dead_claims
+
+        with self.launch_guard:
+            owner = self._owner()
+            self.recovery = reconcile_dead_claims(owner)
+            for resource_id in self.recovery["retired"]:
+                self._observe(self.ledger.get(resource_id))
 
     def _observe(self, record):
         value = record.model_dump(mode="json")
@@ -137,6 +147,9 @@ class OwnedResources:
                 "durable_recovery": "shared_0.20_ledger" if self.owner else "available_not_initialized",
                 "durable_resources": durable,
                 "close_warning": self.close_warning,
+                "supervisor": self.owner.identity.model_dump(mode="json") if self.owner else None,
+                "supervisor_generation": self.owner.owner_id if self.owner else None,
+                "dead_claim_reconciliation": dict(self.recovery),
                 "attached_native_policy": "GetActiveObject only; release COM references, never Quit/Close/save",
                 "shared_native_policy": "No app-launched shared native instance is supported; no ownership transfer",
             }

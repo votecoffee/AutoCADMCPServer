@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import inspect
 import json
+import logging
 from functools import partial, wraps
-from typing import Any
+from typing import Any, get_type_hints
 
 import anyio
 from mcp.server.mcpserver import Context
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from universal_tools.extensions import ExtensionServer as MCPServer
 
@@ -15,6 +17,7 @@ from .artifacts import Artifacts
 from .batch_jobs import BatchJobs
 from .coordination import RequestScheduler
 from .service import DrawingService
+from .tool_types import ArtifactLength, IndexLimit, Limit, Offset, Page, TextLength, Width
 from .transactions import Transactions
 from .workflow_guidance import BOOTSTRAP, Guidance
 
@@ -63,7 +66,7 @@ def create_server(
 
     def tool(*, read=True, control=False):
         def decorate(fn):
-            fn.__annotations__["return"] = dict[str, Any]
+            fn.__annotations__ = {**get_type_hints(fn, include_extras=True), "return": dict[str, Any]}
             original_signature = inspect.signature(fn)
 
             @wraps(fn)
@@ -75,21 +78,41 @@ def create_server(
                 def execute():
                     return fn(*args, **kwargs)
 
-                if read:
-                    result = await scheduler.run(execute, control=control)
-                else:
-                    result = await scheduler.run(
-                        transactions.execute,
-                        request_id,
-                        fn.__name__,
-                        {key: value for key, value in bound.arguments.items() if key != "ctx"},
-                        execute,
-                        control=control,
-                    )
+                try:
+                    if read:
+                        result = await scheduler.run(execute, control=control)
+                    else:
+                        result = await scheduler.run(
+                            transactions.execute,
+                            request_id,
+                            fn.__name__,
+                            {key: value for key, value in bound.arguments.items() if key != "ctx"},
+                            execute,
+                            control=control,
+                        )
+                except FileNotFoundError:
+                    raise ToolError(
+                        "Requested source or app artifact is unavailable; refresh its inventory or receipt"
+                    ) from None
+                except ValueError as error:
+                    message = str(error)
+                    if (
+                        "\n" in message
+                        or "\r" in message
+                        or any(
+                            text in message
+                            for text in ("worker failed:", "Preview failed:", "Extraction worker failed:")
+                        )
+                    ):
+                        logging.getLogger("autocad_mcp").error(
+                            "Drawing processing diagnostic: %s", message[:8192]
+                        )
+                        message = "Drawing processing failed; retained app receipts and private diagnostics require inspection"
+                    raise ToolError(message[:500]) from None
                 if fn.__name__ == "cad_get_artifact":
                     await artifacts.changed()
                 if len(json.dumps(result, ensure_ascii=False).encode("utf-8")) > 200_000:
-                    raise ValueError("Response exceeds budget; use smaller limit or narrower filters")
+                    raise ToolError("Response exceeds budget; use smaller limit or narrower filters")
                 return result
 
             if not read:
@@ -139,7 +162,7 @@ def create_server(
         return {**report(workflow, service.config), "discovery_round_trips": dict(mcp.discovery_round_trips)}
 
     @tool(read=False)
-    def cad_start_index_job(root_id: str, offset: int = 0, limit: int = 5) -> dict:
+    def cad_start_index_job(root_id: str, offset: Offset = 0, limit: IndexLimit = 5) -> dict:
         """Start one durable-intent index batch on a long-lived direct owner. Keep its capability private."""
         if workflow:
             raise ValueError(
@@ -162,7 +185,9 @@ def create_server(
         return jobs.cancel(job_id, access_token)
 
     @tool()
-    def cad_get_artifact(request_id: str, sha256: str, offset: int = 0, length: int = 65536) -> dict:
+    def cad_get_artifact(
+        request_id: str, sha256: str, offset: Offset = 0, length: ArtifactLength = 65536
+    ) -> dict:
         """Read a hash-pinned preview/export chunk from its completed app receipt; URI and base64 fallback."""
         return artifacts.describe(request_id, sha256, offset, length)
 
@@ -187,7 +212,9 @@ def create_server(
         return transactions.get(request_id, include_result)
 
     @tool()
-    def cad_list_files(root_id: str, supported_only: bool = True, offset: int = 0, limit: int = 100) -> dict:
+    def cad_list_files(
+        root_id: str, supported_only: bool = True, offset: Offset = 0, limit: Limit = 100
+    ) -> dict:
         """Inventory a configured drawing root recursively. Unsupported CAD formats can be listed too."""
         return service.inventory(root_id, supported_only, offset, limit)
 
@@ -205,8 +232,8 @@ def create_server(
         entity_type: str | None = None,
         handle: str | None = None,
         block: str | None = None,
-        offset: int = 0,
-        limit: int = 50,
+        offset: Offset = 0,
+        limit: Limit = 50,
     ) -> dict:
         """Read CAD entities and geometry properties by layer/layout/type/handle. Block coordinates are local.
 
@@ -233,9 +260,9 @@ def create_server(
         query: str | None = None,
         layout: str | None = None,
         layer: str | None = None,
-        page: int | None = None,
-        offset: int = 0,
-        limit: int = 100,
+        page: Page | None = None,
+        offset: Offset = 0,
+        limit: Limit = 100,
     ) -> dict:
         """Read/search literal CAD text, block attributes or positioned PDF text. PDF pages are one-based.
 
@@ -248,14 +275,14 @@ def create_server(
 
     @tool()
     def cad_read_text_record(
-        root_id: str, relative_path: str, record_index: int, start: int = 0, length: int = 8000
+        root_id: str, relative_path: str, record_index: Offset, start: Offset = 0, length: TextLength = 8000
     ) -> dict:
         """Read a slice of one text record, using its zero-based record_index. Maximum length is 16000."""
         return service.text_slice(root_id, relative_path, record_index, start, length)
 
     @tool()
     def cad_entity_vertices(
-        root_id: str, relative_path: str, handle: str, offset: int = 0, limit: int = 100
+        root_id: str, relative_path: str, handle: str, offset: Offset = 0, limit: Limit = 100
     ) -> dict:
         """Read LWPOLYLINE vertex slices [x,y,start_width,end_width,bulge] using a CAD entity handle."""
         doc = service.load(root_id, relative_path)
@@ -272,18 +299,18 @@ def create_server(
         }
 
     @tool()
-    def cad_get_layers(root_id: str, relative_path: str, offset: int = 0, limit: int = 100) -> dict:
+    def cad_get_layers(root_id: str, relative_path: str, offset: Offset = 0, limit: Limit = 100) -> dict:
         """Read CAD layer names, colors, linetypes and off/frozen/locked flags."""
         return service.records(root_id, relative_path, "layers", offset, limit)
 
     @tool()
-    def cad_get_blocks(root_id: str, relative_path: str, offset: int = 0, limit: int = 100) -> dict:
+    def cad_get_blocks(root_id: str, relative_path: str, offset: Offset = 0, limit: Limit = 100) -> dict:
         """Read block definitions, base points and xref paths. Read INSERT entities for attributes/placements."""
         return service.records(root_id, relative_path, "blocks", offset, limit)
 
     @tool()
     def cad_get_dimensions(
-        root_id: str, relative_path: str, layout: str | None = None, offset: int = 0, limit: int = 100
+        root_id: str, relative_path: str, layout: str | None = None, offset: Offset = 0, limit: Limit = 100
     ) -> dict:
         """Read dimension entities, raw measurement, type, text override and definition points.
 
@@ -294,24 +321,24 @@ def create_server(
         )
 
     @tool()
-    def cad_get_references(root_id: str, relative_path: str, offset: int = 0, limit: int = 100) -> dict:
+    def cad_get_references(root_id: str, relative_path: str, offset: Offset = 0, limit: Limit = 100) -> dict:
         """List declared xrefs, image and PDF/DWF/DGN underlay paths; never open or load references."""
         return service.records(root_id, relative_path, "references", offset, limit)
 
     @tool()
-    def cad_get_pdf_pages(root_id: str, relative_path: str, offset: int = 0, limit: int = 100) -> dict:
+    def cad_get_pdf_pages(root_id: str, relative_path: str, offset: Offset = 0, limit: Limit = 100) -> dict:
         """Read PDF page sizes, rotation, text counts, image counts and image-only OCR candidates."""
         return service.records(root_id, relative_path, "pages", offset, limit)
 
     @tool()
     def cad_get_pdf_tables(
-        root_id: str, relative_path: str, page: int, offset: int = 0, limit: int = 20
+        root_id: str, relative_path: str, page: Page, offset: Offset = 0, limit: Limit = 20
     ) -> dict:
         """Detect and extract PDF table cells on one one-based page; verify against cad_render_preview."""
         return service.pdf_tables(root_id, relative_path, page, offset, limit)
 
     @tool(read=False)
-    def cad_index_project(root_id: str, ctx: Context, offset: int = 0, limit: int = 2) -> dict:
+    def cad_index_project(root_id: str, ctx: Context, offset: Offset = 0, limit: IndexLimit = 2) -> dict:
         """Index 1..5 files into app-owned search state. Continue next_offset until null; inspect failures.
 
         This writes only the server's cache/index and preserves all source files.
@@ -326,7 +353,7 @@ def create_server(
         return service.index(root_id, offset, limit, progress=progress)
 
     @tool()
-    def cad_search_project(root_id: str, query: str, offset: int = 0, limit: int = 50) -> dict:
+    def cad_search_project(root_id: str, query: str, offset: Offset = 0, limit: Limit = 50) -> dict:
         """Search indexed drawing text/attributes literally across one root with exact provenance.
 
         Stale or deleted files are excluded. Coverage reports missing/stale sources; index first.
@@ -339,15 +366,15 @@ def create_server(
         relative_path: str,
         other_root_id: str,
         other_relative_path: str,
-        offset: int = 0,
-        limit: int = 100,
+        offset: Offset = 0,
+        limit: Limit = 100,
     ) -> dict:
         """Compare text multiplicities and layer/block names across two files; structural content diff only."""
         return service.compare(root_id, relative_path, other_root_id, other_relative_path, offset, limit)
 
     @tool(read=False)
     def cad_render_preview(
-        root_id: str, relative_path: str, page: int = 1, layout: str = "Model", width: int = 1600
+        root_id: str, relative_path: str, page: Page = 1, layout: str = "Model", width: Width = 1600
     ) -> dict:
         """Write a PNG preview in app-owned state. PDF page is one-based; CAD uses an exact layout name.
 

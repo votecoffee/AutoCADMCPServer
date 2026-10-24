@@ -129,10 +129,13 @@ class DrawingService:
             db.close()
 
     def status(self) -> dict:
+        from .deployment_status import snapshot
+
         return {
             "name": "AutoCAD MCP Server",
             "version": __version__,
             "display_version": __display_version__,
+            "deployment": snapshot(),
             "execution_profile": self.config.execution_profile,
             "numerical_threads_per_process": 1,
             "native_operations_available": self.config.execution_profile == ODA_PROFILE,

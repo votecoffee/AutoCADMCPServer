@@ -3,6 +3,7 @@
 from .autocad import highlight
 from .electrical import ElectricalService
 from .profile import require_native
+from .tool_types import Limit, Offset, Tolerance, TraceDepth, TracePaths
 
 
 def register(tool, drawings):
@@ -16,7 +17,7 @@ def register(tool, drawings):
         reports: list[dict] | None = None,
         attribute_map: dict | None = None,
         wire_layers: list[str] | None = None,
-        tolerance: float = 0.0001,
+        tolerance: Tolerance = 0.0001,
         include_pdf_candidates: bool = True,
     ) -> dict:
         """Build immutable project evidence after cad_index_project. WDP supplies membership; explicit reports
@@ -44,8 +45,8 @@ def register(tool, drawings):
     def cad_get_device_inventory(
         project_id: str,
         query: str | None = None,
-        offset: int = 0,
-        limit: int = 50,
+        offset: Offset = 0,
+        limit: Limit = 50,
         pdf_candidates_only: bool = False,
     ) -> dict:
         """Read tags, descriptions, manufacturer/catalog, equipment codes and source handles.
@@ -60,8 +61,8 @@ def register(tool, drawings):
         project_id: str,
         query: str | None = None,
         trace_connections: bool = False,
-        offset: int = 0,
-        limit: int = 25,
+        offset: Offset = 0,
+        limit: Limit = 25,
     ) -> dict:
         """Read controller/rack/slot/channel/address, devices, wires and terminals. Unknown values stay null.
         Optional bounded graph traces carry explicit incomplete/branching status and evidence bases.
@@ -73,8 +74,8 @@ def register(tool, drawings):
         project_id: str,
         device_id: str | None = None,
         connection_id: str | None = None,
-        offset: int = 0,
-        limit: int = 50,
+        offset: Offset = 0,
+        limit: Limit = 50,
     ) -> dict:
         """Read graph edges with source objects/report rows, wires/cables and evidence classification."""
         return service.query(
@@ -87,8 +88,8 @@ def register(tool, drawings):
         device_id: str,
         terminal: str | None = None,
         domain: str = "electrical",
-        max_depth: int = 40,
-        max_paths: int = 20,
+        max_depth: TraceDepth = 40,
+        max_paths: TracePaths = 20,
     ) -> dict:
         """Trace documented electrical or network paths. Associations never imply continuity.
         Stops at a destination device/terminal; continue from that device to follow another segment.
@@ -98,21 +99,21 @@ def register(tool, drawings):
 
     @tool()
     def cad_get_equipment_groups(
-        project_id: str, query: str | None = None, offset: int = 0, limit: int = 50
+        project_id: str, query: str | None = None, offset: Offset = 0, limit: Limit = 50
     ) -> dict:
         """Read explicit installation/location/panel/station groups and separate WDP membership groups."""
         return service.query(project_id, "equipment_groups", offset, limit, query)
 
     @tool()
     def cad_get_network_inventory(
-        project_id: str, query: str | None = None, offset: int = 0, limit: int = 50
+        project_id: str, query: str | None = None, offset: Offset = 0, limit: Limit = 50
     ) -> dict:
         """Read documented device addresses, ports/interfaces and unassociated text literals. No network access."""
         return service.query(project_id, "network", offset, limit, query)
 
     @tool()
     def cad_check_drawing_consistency(
-        project_id: str, code: str | None = None, offset: int = 0, limit: int = 50
+        project_id: str, code: str | None = None, offset: Offset = 0, limit: Limit = 50
     ) -> dict:
         """Review duplicate tags, address conflicts, missing descriptions, references and panel differences.
         Missing scope produces potential conflicts; unavailable comparisons remain explicitly not evaluable.
@@ -121,7 +122,7 @@ def register(tool, drawings):
 
     @tool()
     def cad_compare_electrical_revisions(
-        before_project_id: str, after_project_id: str, offset: int = 0, limit: int = 50
+        before_project_id: str, after_project_id: str, offset: Offset = 0, limit: Limit = 50
     ) -> dict:
         """Compare semantic device/connection records in two historical snapshots with source provenance."""
         return service.compare(before_project_id, after_project_id, offset, limit)
@@ -133,7 +134,7 @@ def register(tool, drawings):
 
     @tool(read=False)
     def cad_highlight_source_object(
-        project_id: str, device_id: str, source_index: int = 0, enabled: bool = True
+        project_id: str, device_id: str, source_index: Offset = 0, enabled: bool = True
     ) -> dict:
         """Highlight an exact top-level source object in an already-running AutoCAD document.
         Requires unchanged disk source and unmodified open drawing. Never launches, opens or saves drawings.

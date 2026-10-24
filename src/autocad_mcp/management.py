@@ -134,6 +134,10 @@ class Reporting:
         return RestartResult(outcome="blocked", message=RESTART_REASON)
 
     def refresh_versions(self):
+        from .deployment_status import refresh_selection, snapshot
+
+        selected = refresh_selection()
+        deployment = snapshot()
         versions = {}
         for component, distribution in (
             ("app", "autocad-mcp-server"),
@@ -142,7 +146,10 @@ class Reporting:
         ):
             value = installed(distribution)
             if value:
-                versions[component] = ComponentVersion(installed=value, running=self.running[component])
+                observed_installed = selected.get("version", value) if component == "app" else value
+                versions[component] = ComponentVersion(
+                    installed=observed_installed, running=self.running[component]
+                )
         # Source metadata supplies availability only; no feed/engineering files are searched.
         try:
             value = tomllib.loads((self.publisher / "pyproject.toml").read_text(encoding="utf-8"))
@@ -174,7 +181,11 @@ class Reporting:
             )
         with self.guard:
             self.versions = versions
-            self.metadata_warning = warning or ("Plugin installation is unobserved" if not plugin else "")
+            self.metadata_warning = (
+                deployment["selection_warning"]
+                or warning
+                or ("Plugin installation is unobserved" if not plugin else "")
+            )
 
     def status(self):
         counts = self.activity()

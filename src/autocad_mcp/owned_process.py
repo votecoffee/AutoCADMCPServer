@@ -23,6 +23,7 @@ from universal_tools.windows_resources import (
 )
 
 from .owned_resources import owned_resources
+from .process_identity import canonical_image_path, same_generation
 from .worker_capture import Captures
 
 DIAGNOSTIC_BYTES = 65_536
@@ -37,6 +38,41 @@ class StreamProcessDriver(ProcessDriver):
         if self.kernel:
             self.kernel.GetExitCodeProcess.argtypes = [w.HANDLE, ctypes.POINTER(w.DWORD)]
             self.kernel.GetExitCodeProcess.restype = w.BOOL
+
+    def capture_handle(self, handle, pid):
+        value = super().capture_handle(handle, pid)
+        return {**value, "executable": canonical_image_path(value["executable"])}
+
+    def state(self, identity):
+        if self.kernel is None or self.host_id is None or identity.get("host_id") != self.host_id:
+            return "unknown"
+        try:
+            with self._open(identity["pid"]) as handle:
+                if not handle.alive():
+                    return "absent"
+                try:
+                    observed = handle.identity
+                except OSError:
+                    return "unknown" if handle.alive() else "absent"
+                if observed["created"] != identity["created"]:
+                    return "different"
+                return "alive" if same_generation(observed, identity) and handle.alive() else "unknown"
+        except ProcessLookupError:
+            return "absent"
+        except (OSError, ValueError, KeyError):
+            return "unknown"
+
+    def open(self, identity):
+        if self.host_id is None or identity.get("host_id") != self.host_id:
+            raise ValueError("Resource belongs to another or unverifiable host")
+        handle = self._open(identity["pid"], terminate=True)
+        try:
+            if not handle.alive() or not same_generation(handle.identity, identity):
+                raise ProcessLookupError("Process generation changed; refusing termination")
+            return handle
+        except BaseException:
+            handle.close()
+            raise
 
     def capture(self, pid):
         # Short-lived launchers can exit after the first wait but before image
