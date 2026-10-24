@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "autocad-mcp-server"
-version = "26.1023.113921"
+version = "26.1024.92515"
 description = "Source-preserving local DWG, DXF and PDF information extraction for MCP"
 readme = "README.md"
 license = "MIT"

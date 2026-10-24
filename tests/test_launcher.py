@@ -13,7 +13,7 @@ pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="Windows root CM
 @pytest.fixture
 def cmd_fixture(tmp_path):
     source = Path(__file__).resolve().parents[1]
-    app = tmp_path / "application & files with spaces"
+    app = tmp_path / "application & files with spaces! 線"
     (app / "scripts").mkdir(parents=True)
     shutil.copyfile(source / "InstallAndRun.cmd", app / "InstallAndRun.cmd")
     subprocess.run([sys.executable, "-m", "venv", "--without-pip", str(app / ".venv")], check=True)

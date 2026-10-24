@@ -76,3 +76,29 @@ Process-lifetime source changes require Windows acceptance in `tests/test_lifeti
 Pure/stub ownership checks are in `tests/test_owned_resources.py`, `tests/test_owned_process_stubs.py`, `tests/test_owned_inventory.py`, `tests/test_worker_capture.py`, `tests/test_job_capacity.py`, `tests/test_autocad.py` and `tests/test_lifetime.py::test_server_slot_admission_is_immediate_and_released_on_exit`. They use private file/ledger state, file locks and stub process/COM APIs. They cover current-supervisor ownership, startup failure, concurrent cleanup, protected/foreign generations, exact attachment identities, cached-status purity, bounded capture/admission and uncertainty without replay.
 
 When an operator explicitly permits harmless non-MCP fixtures, select these lifetime nodes: `test_worker_capture_is_bounded_and_failures_stay_failures`, `test_timeout_terminates_owned_grandchild`, `test_abrupt_owner_exit_closes_worker_job`, `test_stdio_eof_fence_terminates_inflight_owned_child`, `test_nested_helper_retains_the_actual_supervisor_as_sole_owner`, and `test_protected_attachment_survives_owner_close_and_uncertain_detach`. They launch only disposable Python stand-ins in private registries. Exact captured process identities and retained handles control fixture cleanup; orphan recovery is reviewed and original receipts remain. They do not start MCP, AutoCAD, another engineering application, a plugin or a manager. The separate `test_stdio_eof_stops_cli_owner_without_handshake` **does start MCP** and must wait for that explicit authorization. Harmless-process evidence is not real MCP/Codex/native acceptance.
+## Stable launcher repair checks
+
+Use disposable installation/configuration/state/registry roots and harmless DXF fixtures.
+Keep normal clients, drawings, journals and cached plugin files untouched. Run
+`tests/test_stable_policy.py`, `tests/test_process_identity.py`,
+`tests/test_dead_claim_recovery.py`, `tests/test_tool_contract.py`,
+`tests/test_launcher.py` and the existing ownership/lifetime/management suites against
+the reviewed framework 0.20.0 and SDK 2.3.0 environment. These cover policy and schema
+regressions; they do not replace installed protocol acceptance.
+
+Exercise the actual root CMD from another cwd and a path containing spaces/non-ASCII,
+including quoted destinations, unsupported options and exit-code propagation. Install
+an app wheel through the root CMD into a dedicated root, verify `StartMcp.py --check`,
+and repeat the installed no-op. Retain exact bootstrap/dependency/app/config inventories.
+
+Actual stable-route acceptance must retain real initialization, 38-tool catalog, current
+guide and pinned references, synthetic cold read, authenticated management observations,
+normal EOF and terminal resource receipts. Separately retain disposable cache removal,
+missing/tampered selection/payload refusal, CAS conflict, an active old peer while a fresh
+client selects a new generation, server admission bounds and exact owner/parent-loss
+cleanup with safe reconnect. Preserve the original retained-handle observation policy;
+failures and unknown identities stay explicit. Observe MSIX image aliases read-only.
+
+No source/package or direct SDK result establishes current-chat discovery or native ODA
+acceptance. Host settings publication is separate and must preserve exact TOML bytes
+outside owned changes. See [stable launcher](docs/stable-launcher.md).

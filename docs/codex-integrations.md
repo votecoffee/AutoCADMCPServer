@@ -12,6 +12,13 @@ Run `InstallAndRun.cmd --install-only` after supplying the verified framework wh
 
 Selection is saved under ignored `.local/codex-integration.json`. Ordinary `--stdio` startup does not change plugin installation unless explicitly requested. Setup never removes another application's plugin or resets an operation journal.
 
+Registration requires an installed `--stable-home`; checkout/cache bindings cannot be
+published. [Stable launcher migration](stable-launcher.md) retains legacy route pins and
+defers plugin registration until the serialized host publisher migrates that route.
+`InstallAndRun.cmd --install-only --prepare-plugin --codex-integration none` prepares
+the stable standalone package without writing host settings. Old caches, runtimes and
+active peers remain available throughout publication.
+
 ## Frontends
 
 The default native stdio endpoint exposes the 38 `cad_*` tools and starts its own app process. Use `cad_status` and the app's initialization guidance to select explicit drawing/project IDs.

@@ -12,7 +12,7 @@ The default is **direct standalone offline** on Windows: local PDF/DXF and Elect
 
 The current implementation provides 38 tools, revision/hash-pinned workflow guidance, bounded background index jobs, chunked artifact reads and durable request receipts. Windows workers use app-owned Job Objects and creation-checked resource records. Stdio lifetime monitoring retains the original client pipe before SDK descriptor diversion; numerical libraries are limited to one numerical thread per app/worker process. See the [implementation guide](docs/implementation.md) for responsibilities and limits.
 
-Current source release: **26.1023.113921**, stamped once in `America/New_York`. The app and both plugin manifests share the canonical package version `26.1023.113921`. [Versioning](docs/versioning.md) explains padded display timestamps, leading-zero normalization and release checks. Framework `0.20.0` and MCP SDK `2.3.0` remain independently pinned. Source/package verification does not establish installed or native acceptance.
+Current source release: **26.1024.92515**, stamped once in `America/New_York`. The app and both plugin manifests share the canonical package version `26.1024.92515`. [Versioning](docs/versioning.md) explains padded display timestamps, leading-zero normalization and release checks. Framework `0.20.0` and MCP SDK `2.3.0` remain independently pinned. Source/package verification does not establish installed or native acceptance.
 
 ## Table of Contents
 
@@ -49,6 +49,13 @@ From the project root, `InstallAndRun.cmd --help` lists options without installi
 
 The default setup may register or refresh AutoCAD's standalone plugin. Use `--codex-integration none` to install the application without Codex registration. Existing roots are preserved. Setup remains an explicit installation operation; documentation and fixture checks do not require rerunning it on an existing installation.
 
+Published connections now use an **app-owned stable launcher, interpreter and cwd**, outside
+the checkout and plugin caches. Immutable generations retain their exact dependency and
+configuration inventories. Updates preserve active peers; ordinary stdio startup performs
+no installation. See [stable launcher and guarded migration](docs/stable-launcher.md).
+Use `--install-root PATH` for a dedicated destination, `--config PATH` for explicit adoption,
+and `--prepare-plugin --codex-integration none` when a separate publisher owns host settings.
+
 ### Dependencies
 
 - [Python](https://www.python.org/downloads/) 3.11 or later. The PowerShell examples use Python 3.13.
@@ -61,7 +68,14 @@ ODA and Autodesk binaries are not redistributed. Python runtime dependencies are
 
 From a checkout on Windows:
 
-For Windows setup and a foreground compatibility server, run `InstallAndRun.cmd` in the project root. On first setup, supply `--framework-wheel PATH`; the verified wheel is cached privately for subsequent installs. Setup creates or reuses this checkout's `.venv`, installs hash-locked dependencies and the application, preserves existing configuration, and starts legacy loopback MCP HTTP at `http://127.0.0.1:8796/mcp`. On first setup it prompts for a drawing folder. Python 3.11 or newer is required; `uv` is used when available, with pip as the fallback. Native conversion stays disabled. Framework source alignment does not automatically select its new host for an installed workflow.
+For Windows setup and a foreground server, run `InstallAndRun.cmd` in the project root.
+On first setup, supply `--framework-wheel PATH`; the verified wheel is cached privately.
+The stable Windows installer requires reviewed CPython 3.13.9 and `uv` for fresh package
+installation/build. It copies the interpreter and hash-locked dependencies to the user profile's
+Applications directory, extracts a fixed application wheel and selects it after preflight. An explicit
+`--app-wheel PATH --seed-site PATH` supports reviewed offline adoption. It preserves existing
+configuration and starts loopback MCP HTTP at `http://127.0.0.1:8796/mcp` by default. Native
+conversion remains disabled. Source development environments remain local to the checkout.
 
 ```powershell
 .\InstallAndRun.cmd --framework-wheel 'C:\Packages\universal_codex_tools-0.20.0-py3-none-any.whl' --install-only
@@ -71,7 +85,7 @@ For Windows setup and a foreground compatibility server, run `InstallAndRun.cmd`
 .\InstallAndRun.cmd --stdio
 ```
 
-For unattended first setup, use `InstallAndRun.cmd --root "drawings=C:\Engineering\Drawings" --install-only` after staging the framework wheel; repeat `--root` for multiple roots. Setup creates `AutoCAD MCP Server.lnk` in the project root using the bundled icon. The shortcut contains local paths, is ignored by Git, and is recreated for each checkout. `--stdio` keeps setup messages on stderr and does not prompt, create a shortcut or change Codex integration implicitly. Keep the server window open and press Ctrl+C to stop. Standalone bindings start their own stdio backend. The experimental framework frontend connects to its already-running app-owned host.
+For unattended first setup, use `InstallAndRun.cmd --root "drawings=C:\Engineering\Drawings" --install-only` after staging the framework wheel; repeat `--root` for multiple roots. The bundled icon remains available to the standalone plugin. `--stdio` keeps diagnostics on stderr and requires an already installed matching selection; run `--install-only` explicitly before first protocol startup. Keep a foreground server window open and press Ctrl+C to stop. Standalone bindings start their own stdio backend. The experimental framework frontend remains blocked.
 
 Setup defaults to `--codex-integration auto`, which installs or refreshes AutoCAD's standalone plugin. It preserves an explicitly saved skip or a disabled app plugin. An absent CLI or unreadable plugin inventory defers optional installation while leaving the application usable. Use `--codex-integration none` to skip plugin installation or `--install-plugin` to explicitly refresh and enable it. See [standalone plugin installation](docs/codex-integrations.md).
 
